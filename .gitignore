@@ -1,0 +1,33 @@
+
+# Go build artifacts
+bin/
+*.out
+*.test
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Coverage files
+coverage.*
+*.coverprofile
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dependency directories (if any)
+vendor/
+
+# Env/config
+.env
+.env.local
+.env.*.local
+
+# Docker volumes
+docker-data/
