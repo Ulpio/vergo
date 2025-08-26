@@ -1,3 +1,4 @@
+// cmd/api/main.go
 package main
 
 import (
@@ -11,35 +12,26 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	// importa o router do projeto
+	"github.com/Ulpio/vergo/internal/http/router"
 )
 
 func main() {
-	// Configs básicas via env
 	port := getEnvInt("APP_PORT", 8080)
 	env := getEnv("APP_ENV", "dev")
 	version := getEnv("APP_VERSION", "0.1.0")
 
-	// Gin em modo release quando não for dev
 	if env != "dev" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	router := gin.New()
-	router.Use(gin.Recovery())
+	r := gin.New()
+	r.Use(gin.Recovery())
 
-	// Logging simples (você pode trocar por slog/zap depois)
-	router.Use(func(c *gin.Context) {
-		start := time.Now()
-		c.Next()
-		lat := time.Since(start)
-		log.Printf("%s %s -> %d (%s)",
-			c.Request.Method, c.Request.URL.Path, c.Writer.Status(), lat)
-	})
-
-	// Endpoints básicos
+	// Health endpoints
 	startedAt := time.Now()
-
-	router.GET("/healthz", func(c *gin.Context) {
+	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "ok",
 			"uptime":  time.Since(startedAt).String(),
@@ -47,23 +39,26 @@ func main() {
 			"env":     env,
 		})
 	})
-	router.GET("/readyz", func(c *gin.Context) {
-		// aqui dá pra checar DB, fila, etc. Por enquanto: pronto.
+	r.GET("/readyz", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
 
-	// Namespace da API (v1). Adicione suas rotas aqui depois.
-	api := router.Group("/v1")
+	// Grupo da API v1
+	api := r.Group("/v1")
 	{
+		// rota simples de ping
 		api.GET("/_ping", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"pong": true})
 		})
+
+		// registra todos os endpoints stubs
+		router.Register(api)
 	}
 
-	// Servidor + shutdown gracioso
+	// servidor HTTP com shutdown gracioso
 	srv := &http.Server{
 		Addr:         ":" + strconv.Itoa(port),
-		Handler:      router,
+		Handler:      r,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 20 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -76,7 +71,6 @@ func main() {
 		}
 	}()
 
-	// Espera por SIGINT/SIGTERM para desligar com graça
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
