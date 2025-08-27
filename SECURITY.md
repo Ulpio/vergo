@@ -5,7 +5,7 @@ Nós levamos segurança a sério. Se você encontrou uma vulnerabilidade, **não
 
 ## Como reportar
 - Use **GitHub Security Advisory** (Security > Advisories > Report a vulnerability) para reportar de forma privada, **ou**
-- Envie e-mail para: **security@exemplo.com** (substitua pelo seu contato) com:
+- Envie e-mail para: **ulpionetto0@gmail.com** com:
   - Descrição do problema e impacto
   - Passos para reprodução (PoC, logs, versões)
   - Escopo afetado (endpoints, componentes)
