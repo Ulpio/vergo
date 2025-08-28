@@ -3,6 +3,8 @@ package router
 import (
 	"net/http"
 
+	"github.com/Ulpio/vergo/internal/domain/audit"
+	"github.com/Ulpio/vergo/internal/domain/project"
 	"github.com/Ulpio/vergo/internal/domain/user"
 	"github.com/Ulpio/vergo/internal/http/handlers"
 	"github.com/Ulpio/vergo/internal/http/middleware"
@@ -13,8 +15,14 @@ import (
 // Register registra todas as rotas v1.
 func Register(v1 *gin.RouterGroup) {
 	cfg := config.Load()
+
+	//user services
 	usr := user.NewMemoryService()
 	ah := handlers.NewAuthHandler(cfg, usr)
+
+	auditSvc := audit.NewMemoryService()
+	projectSvc := project.NewMemoryService()
+	ph := handlers.NewProjectsHandler(projectSvc, auditSvc)
 
 	auth := v1.Group("/auth")
 	{
@@ -51,11 +59,11 @@ func Register(v1 *gin.RouterGroup) {
 		// Projects
 		projects := protected.Group("/projects")
 		{
-			projects.GET("", notImplemented("projects.list"))
-			projects.POST("", notImplemented("projects.create"))
-			projects.GET("/:id", notImplemented("projects.get"))
-			projects.PATCH("/:id", notImplemented("projects.update"))
-			projects.DELETE("/:id", notImplemented("projects.delete"))
+			projects.GET("", ph.List)
+			projects.POST("", ph.Create)
+			projects.GET("/:id", ph.Get)
+			projects.PATCH("/:id", ph.Update)
+			projects.DELETE("/:id", ph.Delete)
 		}
 
 		// Auditoria
