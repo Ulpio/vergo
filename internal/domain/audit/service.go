@@ -23,7 +23,7 @@ type memoryAudit struct{}
 func NewMemoryService() Service { return &memoryAudit{} }
 
 func (m *memoryAudit) Record(e Event) error {
-	log.Printf("[AUDIT] org=%s actor=%s action=%s entity=%s id=% at=%s",
+	log.Printf("[AUDIT] org=%s actor=%s action=%s entity=%s id=%s at=%s",
 		e.OrgID, e.ActorID, e.Action, e.Entity, e.EntityID, e.Timestamp.Format(time.RFC3339))
 	return nil
 }
