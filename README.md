@@ -59,13 +59,34 @@ scripts/seed/                  # seed de dados
 ---
 
 ## 🧭 Roadmap
-- [ ] Implementar **Auth** (signup/login/refresh)
-- [ ] Adicionar **Tenant + RBAC**
-- [ ] CRUD de **Projects** + Audit log
-- [ ] Integração com **Stripe** (billing)
-- [ ] Upload com **S3 presign**
-- [ ] Observabilidade com OpenTelemetry
 
+### ✅ Concluído
+- Estrutura inicial do projeto (boilerplate Go + Gin).
+- CI/CD com GitHub Actions (build, test, CodeQL, Dependabot).
+- Auth (signup/login/refresh) com JWT (in-memory).
+- Integração com Postgres (docker-compose + .env).
+- CRUD de Projects persistido no Postgres.
+- Organizations + Memberships (owner/admin/member).
+- Tenant Middleware (validação de membership por `X-Org-ID`).
+
+### 🚧 Em andamento
+- RBAC real baseado em role (`owner` | `admin` | `member`).
+- Endpoints de gestão de membros (`PATCH`, `DELETE`).
+- Endpoint `/me` (dados do usuário autenticado).
+- Audit Log persistente.
+
+### 📌 Próximos passos
+- Context API (`/context`) para org ativa sem header.
+- Persistência de refresh tokens (logout, revogação).
+- Upload com S3 (presigned URLs).
+- Integração com Stripe (planos, checkout, webhook).
+- Observabilidade com OpenTelemetry (traces, métricas, logs).
+- Refatorar queries com **sqlc** para tipagem forte.
+
+### 🌟 Futuro
+- Templates multi-tenant (boas práticas SaaS).
+- Deploy em cloud (AWS ECS/Fargate + RDS + S3).
+- Documentação via Swagger/OpenAPI.
 ---
 
 ## 📜 Licença
