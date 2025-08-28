@@ -3,17 +3,23 @@ package router
 import (
 	"net/http"
 
+	"github.com/Ulpio/vergo/internal/domain/user"
+	"github.com/Ulpio/vergo/internal/http/handlers"
+	"github.com/Ulpio/vergo/internal/pkg/config"
 	"github.com/gin-gonic/gin"
 )
 
 // Register registra todas as rotas v1.
 func Register(v1 *gin.RouterGroup) {
-	//Auth
+	cfg := config.Load()
+	usr := user.NewMemoryService()
+	ah := handlers.NewAuthHandler(cfg, usr)
+
 	auth := v1.Group("/auth")
 	{
-		auth.POST("/signup", notImplemented("auth.signup"))
-		auth.POST("/login", notImplemented("auth.login"))
-		auth.POST("/refresh", notImplemented("auth.refresh"))
+		auth.POST("/signup", ah.Signup)
+		auth.POST("/login", ah.Login)
+		auth.POST("/refresh", ah.Refresh)
 		auth.POST("/forgot-password", notImplemented("auth.forgot_password"))
 		auth.POST("/reset-password", notImplemented("auth.reset_password"))
 	}
