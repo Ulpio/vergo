@@ -31,3 +31,6 @@ vendor/
 
 # Docker volumes
 docker-data/
+
+# Air
+tmp
