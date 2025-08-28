@@ -1,10 +1,9 @@
 package project
 
 import (
+	"context"
+	"database/sql"
 	"errors"
-	"sort"
-	"sync"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -21,78 +20,88 @@ type Service interface {
 	Delete(orgID, id string) error
 }
 
-type memoryRepo struct {
-	mu   sync.RWMutex
-	data map[string]Project
+type pgService struct {
+	db *sql.DB
 }
 
-func NewMemoryService() Service {
-	return &memoryRepo{data: make(map[string]Project)}
+func NewPostgresService(db *sql.DB) Service {
+	return &pgService{db: db}
 }
+func (s *pgService) List(orgID string) ([]Project, error) {
+	const q = `
+		SELECT id, org_id, name, description, created_by, created_at, updated_at
+		FROM projects
+		WHERE org_id = $1
+		ORDER BY created_at ASC`
+	rows, err := s.db.QueryContext(context.Background(), q, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-func (m *memoryRepo) List(orgID string) ([]Project, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
 	var out []Project
-	for _, p := range m.data {
-		if p.OrgID == orgID {
-			out = append(out, p)
+	for rows.Next() {
+		var p Project
+		if err := rows.Scan(&p.ID, &p.OrgID, &p.Name, &p.Description, &p.CreatedAt, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
 		}
+		out = append(out, p)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })
-	return out, nil
+	return out, rows.Err()
 }
 
-func (m *memoryRepo) Create(orgID, name, description, userID string) (Project, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	now := time.Now()
-	p := Project{
-		ID:          uuid.NewString(),
-		OrgID:       orgID,
-		Name:        name,
-		Description: description,
-		CreatedBy:   userID,
-		CreatedAt:   now,
-		UpdatedAt:   now,
-	}
-	m.data[p.ID] = p
-	return p, nil
+func (s *pgService) Create(orgID, name, description, userID string) (Project, error) {
+	const q = `
+INSERT INTO projects (id, org_id, name, description, created_by, created_at, updated_at)
+VALUES ($1,$2,$3,$4,$5, NOW(), NOW())
+RETURNING id, org_id, name, description, created_by, created_at, updated_at`
+	id := uuid.NewString()
+	var p Project
+	err := s.db.QueryRowContext(context.Background(), q, id, orgID, name, description, userID).
+		Scan(&p.ID, &p.OrgID, &p.Name, &p.Description, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt)
+	return p, err
 }
 
-func (m *memoryRepo) Get(orgID, id string) (Project, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	p, ok := m.data[id]
-	if !ok || p.OrgID != orgID {
+func (s *pgService) Get(orgID, id string) (Project, error) {
+	const q = `
+SELECT id, org_id, name, description, created_by, created_at, updated_at
+FROM projects
+WHERE id = $1 AND org_id = $2`
+	var p Project
+	err := s.db.QueryRowContext(context.Background(), q, id, orgID).
+		Scan(&p.ID, &p.OrgID, &p.Name, &p.Description, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
 		return Project{}, ErrNotFound
 	}
-	return p, nil
+	return p, err
 }
 
-func (m *memoryRepo) Update(orgID, id, name, description string) (Project, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	p, ok := m.data[id]
-	if !ok || p.OrgID != orgID {
+func (s *pgService) Update(orgID, id, name, description string) (Project, error) {
+	const q = `
+UPDATE projects
+SET name = COALESCE(NULLIF($3,''), name),
+    description = $4,
+    updated_at = NOW()
+WHERE id = $1 AND org_id = $2
+RETURNING id, org_id, name, description, created_by, created_at, updated_at`
+	var p Project
+	err := s.db.QueryRowContext(context.Background(), q, id, orgID, name, description).
+		Scan(&p.ID, &p.OrgID, &p.Name, &p.Description, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
 		return Project{}, ErrNotFound
 	}
-	if name != "" {
-		p.Name = name
-	}
-	p.Description = description
-	p.UpdatedAt = time.Now()
-	m.data[id] = p
-	return p, nil
+	return p, err
 }
 
-func (m *memoryRepo) Delete(orgID, id string) error {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	p, ok := m.data[id]
-	if !ok || p.OrgID != orgID {
+func (s *pgService) Delete(orgID, id string) error {
+	const q = `DELETE FROM projects WHERE id = $1 AND org_id = $2`
+	res, err := s.db.ExecContext(context.Background(), q, id, orgID)
+	if err != nil {
+		return err
+	}
+	aff, _ := res.RowsAffected()
+	if aff == 0 {
 		return ErrNotFound
 	}
-	delete(m.data, id)
 	return nil
 }

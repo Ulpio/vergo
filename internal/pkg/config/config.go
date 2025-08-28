@@ -14,6 +14,13 @@ type Config struct {
 	JWTRefreshTTLDays   int
 	JWTAccessSecret     string
 	JWTRefreshSecret    string
+
+	DBHost string
+	DBPort int
+	DBUser string
+	DBPass string
+	DBName string
+	DBSSL  string
 }
 
 func getEnv(key, def string) string {
@@ -41,5 +48,12 @@ func Load() Config {
 		JWTRefreshTTLDays:   getInt("JWT_REFRESH_TTL_DAYS", 14),
 		JWTAccessSecret:     getEnv("JWT_ACCESS_SECRET", "dev-access-secret"),   // troque em prod
 		JWTRefreshSecret:    getEnv("JWT_REFRESH_SECRET", "dev-refresh-secret"), // troque em prod
+
+		DBHost: getEnv("DB_HOST", "localhost"),
+		DBPort: getInt("DB_PORT", 5432),
+		DBUser: getEnv("DB_USER", "app"),
+		DBPass: getEnv("DB_PASSWORD", "app"),
+		DBName: getEnv("DB_NAME", "vergo"),
+		DBSSL:  getEnv("DB_SSLMODE", "disable"),
 	}
 }

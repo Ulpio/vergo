@@ -9,6 +9,7 @@ import (
 	"github.com/Ulpio/vergo/internal/http/handlers"
 	"github.com/Ulpio/vergo/internal/http/middleware"
 	"github.com/Ulpio/vergo/internal/pkg/config"
+	"github.com/Ulpio/vergo/internal/pkg/db"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,12 +17,17 @@ import (
 func Register(v1 *gin.RouterGroup) {
 	cfg := config.Load()
 
+	sqlDB, err := db.Open(cfg)
+	if err != nil {
+		panic(err)
+	}
+
 	//user services
 	usr := user.NewMemoryService()
 	ah := handlers.NewAuthHandler(cfg, usr)
 
 	auditSvc := audit.NewMemoryService()
-	projectSvc := project.NewMemoryService()
+	projectSvc := project.NewPostgresService(sqlDB)
 	ph := handlers.NewProjectsHandler(projectSvc, auditSvc)
 
 	auth := v1.Group("/auth")
