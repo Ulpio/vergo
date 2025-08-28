@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/Ulpio/vergo/internal/domain/audit"
+	"github.com/Ulpio/vergo/internal/domain/org"
 	"github.com/Ulpio/vergo/internal/domain/project"
 	"github.com/Ulpio/vergo/internal/domain/user"
 	"github.com/Ulpio/vergo/internal/http/handlers"
@@ -17,24 +18,28 @@ import (
 func Register(v1 *gin.RouterGroup) {
 	cfg := config.Load()
 
+	// DB
 	sqlDB, err := db.Open(cfg)
 	if err != nil {
 		panic(err)
 	}
 
-	//user services
-	usr := user.NewMemoryService()
-	ah := handlers.NewAuthHandler(cfg, usr)
-
+	// Services
+	userSvc := user.NewPostgresService(sqlDB)
+	orgSvc := org.NewPostgresService(sqlDB)
+	projSvc := project.NewPostgresService(sqlDB)
 	auditSvc := audit.NewMemoryService()
-	projectSvc := project.NewPostgresService(sqlDB)
-	ph := handlers.NewProjectsHandler(projectSvc, auditSvc)
+
+	// Handlers
+	authH := handlers.NewAuthHandler(cfg, userSvc)
+	orgH := handlers.NewOrgsHandler(orgSvc)
+	projH := handlers.NewProjectsHandler(projSvc, auditSvc)
 
 	auth := v1.Group("/auth")
 	{
-		auth.POST("/signup", ah.Signup)
-		auth.POST("/login", ah.Login)
-		auth.POST("/refresh", ah.Refresh)
+		auth.POST("/signup", authH.Signup)
+		auth.POST("/login", authH.Login)
+		auth.POST("/refresh", authH.Refresh)
 		auth.POST("/forgot-password", notImplemented("auth.forgot_password"))
 		auth.POST("/reset-password", notImplemented("auth.reset_password"))
 	}
@@ -43,14 +48,14 @@ func Register(v1 *gin.RouterGroup) {
 	protected := v1.Group("/")
 	protected.Use(
 		middleware.Auth(cfg),
-		middleware.Tenant(),
 	)
 	{
 		// Organizações & membros (exemplo; refine RBAC depois)
 		orgs := protected.Group("/orgs")
 		{
-			orgs.POST("", notImplemented("orgs.create"))
-			orgs.GET("/:id", notImplemented("orgs.get"))
+			orgs.POST("", orgH.Create)
+			orgs.Use(middleware.Tenant(orgSvc))
+			orgs.GET("/:id", orgH.Get)
 			orgs.PATCH("/:id", notImplemented("orgs.update"))
 			orgs.POST("/:id/invite", notImplemented("orgs.invite"))
 			orgs.POST("/:id/members", notImplemented("orgs.members.add"))
@@ -65,11 +70,11 @@ func Register(v1 *gin.RouterGroup) {
 		// Projects
 		projects := protected.Group("/projects")
 		{
-			projects.GET("", ph.List)
-			projects.POST("", ph.Create)
-			projects.GET("/:id", ph.Get)
-			projects.PATCH("/:id", ph.Update)
-			projects.DELETE("/:id", ph.Delete)
+			projects.GET("", projH.List)
+			projects.POST("", projH.Create)
+			projects.GET("/:id", projH.Get)
+			projects.PATCH("/:id", projH.Update)
+			projects.DELETE("/:id", projH.Delete)
 		}
 
 		// Auditoria
