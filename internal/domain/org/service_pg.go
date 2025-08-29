@@ -21,6 +21,8 @@ type Service interface {
 	UpdateMember(orgID, userID, role string) error
 	RemoveMember(orgID, userID string) error
 	IsMember(orgID, userID string) (bool, string, error) // (ok, role)
+
+	Delete(orgID string) error
 }
 
 type pgService struct{ db *sql.DB }
@@ -104,4 +106,10 @@ func (s *pgService) IsMember(orgID, userID string) (bool, string, error) {
 		return false, "", nil
 	}
 	return err == nil, role, err
+}
+
+func (s *pgService) Delete(id string) error {
+	_, err := s.db.ExecContext(context.Background(),
+		`DELETE FROM organizations WHERE id=$1`, id)
+	return err
 }

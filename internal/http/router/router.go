@@ -45,30 +45,34 @@ func Register(v1 *gin.RouterGroup) {
 	}
 
 	// ── Rotas protegidas (exigem Bearer + X-Org-ID) ───────────────────
-	protected := v1.Group("/")
-	protected.Use(
-		middleware.Auth(cfg),
-	)
+	authOnly := v1.Group("/")
+	authOnly.Use(middleware.Auth(cfg))
 	{
-		// Organizações & membros (exemplo; refine RBAC depois)
+		orgs := authOnly.Group("/orgs")
+		{
+			orgs.POST("", orgH.Create) // criar org não exige tenant
+			orgs.GET("/:id", orgH.Get)
+		}
+	}
+
+	// Rotas com Auth + Tenant (membership obrigatório)
+	protected := v1.Group("/")
+	protected.Use(middleware.Auth(cfg), middleware.Tenant(orgSvc))
+	{
+		// Orgs (rotas sensíveis com RBAC)
 		orgs := protected.Group("/orgs")
 		{
-			orgs.POST("", orgH.Create)
-			orgs.Use(middleware.Tenant(orgSvc))
-			orgs.GET("/:id", orgH.Get)
-			orgs.PATCH("/:id", notImplemented("orgs.update"))
-			orgs.POST("/:id/invite", notImplemented("orgs.invite"))
-			orgs.POST("/:id/members", notImplemented("orgs.members.add"))
-			orgs.PATCH("/:id/members/:userId", notImplemented("orgs.members.update"))
-			orgs.DELETE("/:id/members/:userId", notImplemented("orgs.members.remove"))
+			// gestão de membros: admin ou owner
+			orgs.POST("/:id/members", middleware.RequireRole("admin"), orgH.AddMember)
+			orgs.PATCH("/:id/members/:userId", middleware.RequireRole("admin"), orgH.UpdateMember)
+			orgs.DELETE("/:id/members/:userId", middleware.RequireRole("admin"), orgH.RemoveMember)
+
+			// excluir org: somente owner
+			orgs.DELETE("/:id", middleware.RequireRole("owner"), orgH.Delete)
 		}
 
-		// Contexto de organização
-		protected.GET("/context", notImplemented("context.get"))
-		protected.POST("/context", notImplemented("context.set"))
-
-		// Projects
-		projects := protected.Group("/projects")
+		// Projects (qualquer member+ pode criar/editar)
+		projects := protected.Group("/projects", middleware.RequireRole("member"))
 		{
 			projects.GET("", projH.List)
 			projects.POST("", projH.Create)
@@ -76,42 +80,41 @@ func Register(v1 *gin.RouterGroup) {
 			projects.PATCH("/:id", projH.Update)
 			projects.DELETE("/:id", projH.Delete)
 		}
-
-		// Auditoria
-		protected.GET("/audit", notImplemented("audit.list"))
-
-		// API Keys
-		keys := protected.Group("/api-keys")
-		{
-			keys.POST("", notImplemented("apikeys.create"))
-			keys.GET("", notImplemented("apikeys.list"))
-			keys.DELETE("/:id", notImplemented("apikeys.delete"))
-		}
-
-		// Webhooks
-		wh := protected.Group("/webhooks")
-		{
-			wh.POST("/endpoints", notImplemented("webhooks.endpoints.create"))
-			wh.GET("/endpoints", notImplemented("webhooks.endpoints.list"))
-			wh.PATCH("/endpoints/:id", notImplemented("webhooks.endpoints.update"))
-			wh.POST("/test", notImplemented("webhooks.test"))
-		}
-
-		// Billing
-		billing := protected.Group("/billing")
-		{
-			billing.POST("/checkout-session", notImplemented("billing.checkout_session"))
-			billing.GET("/subscription", notImplemented("billing.subscription.get"))
-			billing.POST("/webhook", notImplemented("billing.webhook"))
-		}
-
-		// Storage
-		storage := protected.Group("/storage")
-		{
-			storage.POST("/presign", notImplemented("storage.presign"))
-		}
 	}
 
+	// Auditoria
+	protected.GET("/audit", notImplemented("audit.list"))
+
+	// API Keys
+	keys := protected.Group("/api-keys")
+	{
+		keys.POST("", notImplemented("apikeys.create"))
+		keys.GET("", notImplemented("apikeys.list"))
+		keys.DELETE("/:id", notImplemented("apikeys.delete"))
+	}
+
+	// Webhooks
+	wh := protected.Group("/webhooks")
+	{
+		wh.POST("/endpoints", notImplemented("webhooks.endpoints.create"))
+		wh.GET("/endpoints", notImplemented("webhooks.endpoints.list"))
+		wh.PATCH("/endpoints/:id", notImplemented("webhooks.endpoints.update"))
+		wh.POST("/test", notImplemented("webhooks.test"))
+	}
+
+	// Billing
+	billing := protected.Group("/billing")
+	{
+		billing.POST("/checkout-session", notImplemented("billing.checkout_session"))
+		billing.GET("/subscription", notImplemented("billing.subscription.get"))
+		billing.POST("/webhook", notImplemented("billing.webhook"))
+	}
+
+	// Storage
+	storage := protected.Group("/storage")
+	{
+		storage.POST("/presign", notImplemented("storage.presign"))
+	}
 	_ = http.StatusNotImplemented
 }
 

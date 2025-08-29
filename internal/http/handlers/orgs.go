@@ -66,3 +66,40 @@ func (h *OrgsHandler) AddMember(c *gin.Context) {
 	}
 	c.Status(http.StatusNoContent)
 }
+
+func (h *OrgsHandler) UpdateMember(c *gin.Context) {
+	orgID := c.Param("id")
+	userID := c.Param("userID")
+	var in struct {
+		Role string `json:"role" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid_payload"})
+		return
+	}
+	if err := h.os.UpdateMember(orgID, userID, in.Role); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "updated_failed", "detai": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *OrgsHandler) RemoveMember(c *gin.Context) {
+	orgID := c.Param("id")
+	userID := c.Param("userID")
+
+	if err := h.os.RemoveMember(orgID, userID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "failed_remove_member", "detail": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *OrgsHandler) Delete(c *gin.Context) {
+	orgID := c.Param("id")
+	if err := h.os.Delete(orgID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "failed_delete_organization", "detail": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
