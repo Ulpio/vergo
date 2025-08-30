@@ -30,7 +30,7 @@ func Register(v1 *gin.RouterGroup) {
 	userSvc := user.NewPostgresService(sqlDB)
 	orgSvc := org.NewPostgresService(sqlDB)
 	projSvc := project.NewPostgresService(sqlDB)
-	auditSvc := audit.NewMemoryService()
+	auditSvc := audit.NewPostgresService(sqlDB)
 	rfStore := auth.NewRefreshStore(sqlDB)
 
 	// Handlers
