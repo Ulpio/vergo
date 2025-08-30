@@ -10,10 +10,12 @@ import (
 	"github.com/Ulpio/vergo/internal/domain/org"
 	"github.com/Ulpio/vergo/internal/domain/project"
 	"github.com/Ulpio/vergo/internal/domain/user"
+	"github.com/Ulpio/vergo/internal/domain/userctx"
 	"github.com/Ulpio/vergo/internal/http/handlers"
 	"github.com/Ulpio/vergo/internal/http/middleware"
 	"github.com/Ulpio/vergo/internal/pkg/config"
 	"github.com/Ulpio/vergo/internal/pkg/db"
+	s3store "github.com/Ulpio/vergo/internal/storage/s3"
 )
 
 // Register registra todas as rotas v1.
@@ -32,6 +34,7 @@ func Register(v1 *gin.RouterGroup) {
 	projSvc := project.NewPostgresService(sqlDB)
 	auditSvc := audit.NewPostgresService(sqlDB)
 	rfStore := auth.NewRefreshStore(sqlDB)
+	ctxSvc := userctx.NewPostgresService(sqlDB)
 
 	// Handler
 	authH := handlers.NewAuthHandler(cfg, userSvc, rfStore)
@@ -39,6 +42,13 @@ func Register(v1 *gin.RouterGroup) {
 	projH := handlers.NewProjectsHandler(projSvc, auditSvc)
 	meH := handlers.NewMeHandler(userSvc, orgSvc)
 	auditH := handlers.NewAuditHandler(auditSvc)
+	ctxH := handlers.NewContextHandler(ctxSvc, orgSvc)
+
+	s3c, err := s3store.NewFromEnv()
+	if err != nil {
+		panic(err)
+	}
+	storH := handlers.NewStorageHandler(s3c)
 
 	// ── Público (sem token) ───────────────────────────────────────────
 	auth := v1.Group("/auth")
@@ -58,6 +68,8 @@ func Register(v1 *gin.RouterGroup) {
 		authOnly.GET("/me", meH.Get)
 		// logout de todos os devices do usuário logado
 		authOnly.POST("/auth/logout-all", authH.LogoutAll)
+		authOnly.GET("/context", ctxH.Get)
+		authOnly.POST("/context", ctxH.Set)
 
 		orgs := authOnly.Group("/orgs")
 		{
@@ -68,7 +80,7 @@ func Register(v1 *gin.RouterGroup) {
 
 	// ── Autenticado + Tenant (exige X-Org-ID e membership) ────────────
 	protected := v1.Group("/")
-	protected.Use(middleware.Auth(cfg), middleware.Tenant(orgSvc))
+	protected.Use(middleware.Auth(cfg), middleware.Tenant(orgSvc, ctxSvc))
 	{
 		// Orgs (rotas sensíveis com RBAC)
 		orgs := protected.Group("/orgs")
@@ -121,9 +133,9 @@ func Register(v1 *gin.RouterGroup) {
 		}
 
 		// Storage
-		storage := protected.Group("/storage")
+		storage := protected.Group("/storage", middleware.RequireRole("member"))
 		{
-			storage.POST("/presign", notImplemented("storage.presign"))
+			storage.POST("/presign", storH.Presign)
 		}
 	}
 
