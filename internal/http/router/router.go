@@ -33,11 +33,12 @@ func Register(v1 *gin.RouterGroup) {
 	auditSvc := audit.NewPostgresService(sqlDB)
 	rfStore := auth.NewRefreshStore(sqlDB)
 
-	// Handlers
+	// Handler
 	authH := handlers.NewAuthHandler(cfg, userSvc, rfStore)
 	orgH := handlers.NewOrgsHandler(orgSvc)
 	projH := handlers.NewProjectsHandler(projSvc, auditSvc)
 	meH := handlers.NewMeHandler(userSvc, orgSvc)
+	auditH := handlers.NewAuditHandler(auditSvc)
 
 	// ── Público (sem token) ───────────────────────────────────────────
 	auth := v1.Group("/auth")
@@ -92,7 +93,7 @@ func Register(v1 *gin.RouterGroup) {
 		}
 
 		// Auditoria
-		protected.GET("/audit", notImplemented("audit.list"))
+		protected.GET("/audit", middleware.RequireRole("admin"), auditH.List)
 
 		// API Keys
 		keys := protected.Group("/api-keys")
