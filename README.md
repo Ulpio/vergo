@@ -68,17 +68,17 @@ scripts/seed/                  # seed de dados
 - CRUD de Projects persistido no Postgres.
 - Organizations + Memberships (owner/admin/member).
 - Tenant Middleware (validação de membership por `X-Org-ID`).
-
-### 🚧 Em andamento
 - RBAC real baseado em role (`owner` | `admin` | `member`).
 - Endpoints de gestão de membros (`PATCH`, `DELETE`).
 - Endpoint `/me` (dados do usuário autenticado).
 - Audit Log persistente.
 
-### 📌 Próximos passos
+### 🚧 Em andamento
 - Context API (`/context`) para org ativa sem header.
 - Persistência de refresh tokens (logout, revogação).
 - Upload com S3 (presigned URLs).
+
+### 📌 Próximos passos
 - Integração com Stripe (planos, checkout, webhook).
 - Observabilidade com OpenTelemetry (traces, métricas, logs).
 - Refatorar queries com **sqlc** para tipagem forte.
