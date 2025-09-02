@@ -7,6 +7,7 @@ import (
 
 	"github.com/Ulpio/vergo/internal/auth"
 	"github.com/Ulpio/vergo/internal/domain/audit"
+	"github.com/Ulpio/vergo/internal/domain/file"
 	"github.com/Ulpio/vergo/internal/domain/org"
 	"github.com/Ulpio/vergo/internal/domain/project"
 	"github.com/Ulpio/vergo/internal/domain/user"
@@ -35,6 +36,7 @@ func Register(v1 *gin.RouterGroup) {
 	auditSvc := audit.NewPostgresService(sqlDB)
 	rfStore := auth.NewRefreshStore(sqlDB)
 	ctxSvc := userctx.NewPostgresService(sqlDB)
+	fileSvc := file.NewPostgresService(sqlDB)
 
 	// Handler
 	authH := handlers.NewAuthHandler(cfg, userSvc, rfStore)
@@ -48,7 +50,7 @@ func Register(v1 *gin.RouterGroup) {
 	if err != nil {
 		panic(err)
 	}
-	storH := handlers.NewStorageHandler(s3c)
+	storH := handlers.NewStorageHandler(s3c, fileSvc)
 
 	// ── Público (sem token) ───────────────────────────────────────────
 	auth := v1.Group("/auth")
@@ -135,7 +137,13 @@ func Register(v1 *gin.RouterGroup) {
 		// Storage
 		storage := protected.Group("/storage", middleware.RequireRole("member"))
 		{
-			storage.POST("/presign", storH.Presign)
+			storage.POST("/presign", storH.PresignPut)          // PUT upload
+			storage.POST("/presign-download", storH.PresignGet) // GET download
+
+			storage.GET("/files", storH.ListFiles)
+			storage.POST("/files", storH.CreateFile) // registra metadados após upload
+			storage.GET("/files/:id", storH.GetFile)
+			storage.DELETE("/files/:id", storH.DeleteFile)
 		}
 	}
 

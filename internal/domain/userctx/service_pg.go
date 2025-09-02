@@ -26,8 +26,11 @@ func (s *pgService) GetActiveOrg(userID string) (string, bool, error) {
 
 func (s *pgService) SetActiveOrg(userID, orgID string) error {
 	const q = `
-	INSERT INTO user_contexts (user_id,org_id) VALUES ($1,$2)
-	ON CONFLICT (user_id) DO UPDATE SET org_id EXCLUDED.org_id, updated_at=NOW()`
+INSERT INTO user_contexts (user_id, org_id, updated_at)
+VALUES ($1, $2, NOW())
+ON CONFLICT (user_id) DO UPDATE
+SET org_id = $2,
+    updated_at = NOW()`
 	_, err := s.db.ExecContext(context.Background(), q, userID, orgID)
 	return err
 }
