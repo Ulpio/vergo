@@ -86,7 +86,10 @@ func (s *S3) PresignPut(ctx context.Context, bucket, key, contentType string, ex
 		return "", nil, err
 	}
 
-	headers := map[string]string{"Content-Type": contentType}
+	headers := map[string]string{
+		"Content-Type": contentType,
+		"x-amz-acl":    string(s3types.ObjectCannedACLPrivate),
+	}
 	return ps.URL, headers, nil
 }
 
