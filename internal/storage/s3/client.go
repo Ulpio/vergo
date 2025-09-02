@@ -3,6 +3,7 @@ package s3store
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -24,27 +25,25 @@ func NewFromEnv() (*S3, error) {
 	region := getenv("S3_REGION", "us-east-2")
 	endpoint := os.Getenv("S3_ENDPOINT")
 	akid := os.Getenv("S3_ACCESS_KEY_ID")
+	if akid == "" {
+		akid = os.Getenv("AWS_ACCESS_KEY_ID")
+	}
 	secret := os.Getenv("S3_SECRET_ACCESS_KEY")
+	if secret == "" {
+		secret = os.Getenv("AWS_SECRET_ACCESS_KEY")
+	}
+	if akid == "" || secret == "" {
+		return nil, fmt.Errorf("missing S3_ACCESS_KEY_ID or S3_SECRET_ACCESS_KEY")
+	}
 	session := os.Getenv("AWS_SESSION_TOKEN")
 	forcePathStyle := getbool("S3_FORCE_PATH_STYLE", false)
 	bucket := os.Getenv("S3_BUCKET")
 
-	var (
-		cfg aws.Config
-		err error
+	provider := credentials.NewStaticCredentialsProvider(akid, secret, session)
+	cfg, err := config.LoadDefaultConfig(context.Background(),
+		config.WithRegion(region),
+		config.WithCredentialsProvider(provider),
 	)
-
-	if akid != "" && secret != "" {
-		provider := credentials.NewStaticCredentialsProvider(akid, secret, session)
-		cfg, err = config.LoadDefaultConfig(context.Background(),
-			config.WithRegion(region),
-			config.WithCredentialsProvider(provider),
-		)
-	} else {
-		cfg, err = config.LoadDefaultConfig(context.Background(),
-			config.WithRegion(region),
-		)
-	}
 	if err != nil {
 		return nil, err
 	}
