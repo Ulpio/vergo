@@ -38,6 +38,9 @@ func NewFromEnv() (*S3, error) {
 	session := os.Getenv("AWS_SESSION_TOKEN")
 	forcePathStyle := getbool("S3_FORCE_PATH_STYLE", false)
 	bucket := os.Getenv("S3_BUCKET")
+	if bucket == "" {
+		return nil, fmt.Errorf("missing S3_BUCKET")
+	}
 
 	provider := credentials.NewStaticCredentialsProvider(akid, secret, session)
 	cfg, err := config.LoadDefaultConfig(context.Background(),
