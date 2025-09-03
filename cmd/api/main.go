@@ -12,10 +12,17 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 
 	// importa o router do projeto
 	"github.com/Ulpio/vergo/internal/http/router"
 )
+
+func init() {
+	if err := godotenv.Load(); err != nil {
+		_ = err
+	}
+}
 
 func main() {
 	port := getEnvInt("APP_PORT", 8080)
