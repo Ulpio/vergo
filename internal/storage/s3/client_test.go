@@ -51,3 +51,13 @@ func TestNewFromEnvMissingCredentials(t *testing.T) {
 		t.Fatalf("expected error when credentials are missing")
 	}
 }
+
+func TestNewFromEnvMissingBucket(t *testing.T) {
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	t.Setenv("S3_ACCESS_KEY_ID", "AKIAEXAMPLE")
+	t.Setenv("S3_SECRET_ACCESS_KEY", "secret")
+	t.Setenv("S3_BUCKET", "")
+	if _, err := NewFromEnv(); err == nil {
+		t.Fatalf("expected error when bucket is missing")
+	}
+}
