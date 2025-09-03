@@ -26,10 +26,18 @@ type Config struct {
 	DBName string
 	DBSSL  string
 
-	// Storage (S3)
-	// Se você não configurar nada no .env, continuam válidos e inofensivos.
-	StorageAllowedTypes []string // ex.: image/png,image/jpeg,application/pdf
-	StorageMaxMB        int      // limite por arquivo em MB (0 = sem limite)
+	// S3 (carregado do .env)
+	S3Region          string
+	S3Bucket          string
+	S3Endpoint        string
+	S3ForcePathStyle  bool
+	S3AccessKeyID     string
+	S3SecretAccessKey string
+	AWSSessionToken   string // opcional (para credenciais temporárias)
+
+	// Storage policy (opcional)
+	StorageAllowedTypes []string
+	StorageMaxMB        int
 }
 
 func getenv(key, def string) string {
@@ -38,7 +46,6 @@ func getenv(key, def string) string {
 	}
 	return def
 }
-
 func getint(key string, def int) int {
 	if v := os.Getenv(key); v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
@@ -47,7 +54,14 @@ func getint(key string, def int) int {
 	}
 	return def
 }
-
+func getbool(key string, def bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+	}
+	return def
+}
 func splitCSV(s string) []string {
 	if s == "" {
 		return nil
@@ -84,7 +98,16 @@ func Load() Config {
 		DBName: getenv("DB_NAME", "vergo"),
 		DBSSL:  getenv("DB_SSLMODE", "disable"),
 
-		// Storage
+		// S3
+		S3Region:          getenv("S3_REGION", "us-east-1"),
+		S3Bucket:          getenv("S3_BUCKET", ""),
+		S3Endpoint:        getenv("S3_ENDPOINT", ""),
+		S3ForcePathStyle:  getbool("S3_FORCE_PATH_STYLE", false),
+		S3AccessKeyID:     getenv("S3_ACCESS_KEY_ID", ""),
+		S3SecretAccessKey: getenv("S3_SECRET_ACCESS_KEY", ""),
+		AWSSessionToken:   getenv("AWS_SESSION_TOKEN", ""),
+
+		// Storage policy
 		StorageAllowedTypes: splitCSV(getenv("STORAGE_ALLOWED_TYPES", "")),
 		StorageMaxMB:        getint("STORAGE_MAX_MB", 25),
 	}

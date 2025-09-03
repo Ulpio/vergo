@@ -46,7 +46,7 @@ func Register(v1 *gin.RouterGroup) {
 	auditH := handlers.NewAuditHandler(auditSvc)
 	ctxH := handlers.NewContextHandler(ctxSvc, orgSvc)
 
-	s3c, err := s3store.NewFromEnv()
+	s3c, err := s3store.NewFromConfig(cfg)
 	if err != nil {
 		panic(err)
 	}
