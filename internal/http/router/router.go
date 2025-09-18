@@ -141,7 +141,7 @@ func Register(v1 *gin.RouterGroup) {
 			storage.POST("/presign-download", storH.PresignGet) // GET download
 
 			storage.GET("/files", storH.ListFiles)
-			storage.POST("/files", storH.CreateFile) // registra metadados após upload
+			storage.POST("/files", storH.CreateFile)
 			storage.GET("/files/:id", storH.GetFile)
 			storage.DELETE("/files/:id", storH.DeleteFile)
 		}
