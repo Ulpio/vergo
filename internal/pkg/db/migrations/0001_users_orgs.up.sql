@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS users(
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS organizations (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  owner_user_id TEXT NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS memberships (
+  org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL DEFAULT 'member',
+  PRIMARY KEY (org_id, user_id)
+);

@@ -16,6 +16,8 @@ import (
 
 	// importa o router do projeto
 	"github.com/Ulpio/vergo/internal/http/router"
+	"github.com/Ulpio/vergo/internal/pkg/config"
+	"github.com/Ulpio/vergo/internal/pkg/db"
 )
 
 func init() {
@@ -25,9 +27,31 @@ func init() {
 }
 
 func main() {
-	port := getEnvInt("APP_PORT", 8080)
-	env := getEnv("APP_ENV", "dev")
-	version := getEnv("APP_VERSION", "0.1.0")
+	// Carrega configurações
+	cfg := config.Load()
+	port := cfg.AppPort
+	env := cfg.AppEnv
+	version := cfg.AppVersion
+
+	// Conecta ao banco de dados
+	log.Println("Conectando ao banco de dados...")
+	database, err := db.Open(cfg)
+	if err != nil {
+		log.Fatalf("Erro ao conectar ao banco: %v", err)
+	}
+	defer database.Close()
+
+	// Testa a conexão
+	if err := database.Ping(); err != nil {
+		log.Fatalf("Erro ao fazer ping no banco: %v", err)
+	}
+	log.Println("Conexão com o banco estabelecida")
+
+	// Executa migrations
+	log.Println("🚀 Executando migrations...")
+	if err := db.RunMigrations(database); err != nil {
+		log.Fatalf("Erro ao executar migrations: %v", err)
+	}
 
 	if env != "dev" {
 		gin.SetMode(gin.ReleaseMode)
