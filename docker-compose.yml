@@ -11,11 +11,26 @@ services:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-app} -d ${DB_NAME:-vergo}"]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  migrate:
+    image: migrate/migrate:latest
+    container_name: vergo_migrate
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./db/migrations:/migrations
+    command: >
+      -path=/migrations
+      -database postgres://${DB_USER:-app}:${DB_PASSWORD:-app}@db:5432/${DB_NAME:-vergo}?sslmode=disable
+      up
+    restart: on-failure
 
 volumes:
   pgdata:
