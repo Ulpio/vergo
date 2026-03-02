@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
 	// importa o router do projeto
 	"github.com/Ulpio/vergo/internal/http/router"
@@ -75,6 +76,7 @@ func main() {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
+	r.Use(otelgin.Middleware("vergo"))
 
 	// Health endpoints
 	startedAt := time.Now()
