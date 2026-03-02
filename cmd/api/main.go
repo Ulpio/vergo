@@ -18,6 +18,7 @@ import (
 	"github.com/Ulpio/vergo/internal/http/router"
 	"github.com/Ulpio/vergo/internal/pkg/config"
 	"github.com/Ulpio/vergo/internal/pkg/db"
+	"github.com/Ulpio/vergo/internal/pkg/telemetry"
 )
 
 func init() {
@@ -32,6 +33,21 @@ func main() {
 	port := cfg.AppPort
 	env := cfg.AppEnv
 	version := cfg.AppVersion
+
+	// Inicializa OpenTelemetry (TracerProvider + MeterProvider)
+	ctx := context.Background()
+	shutdownTelemetry, err := telemetry.Init(ctx, telemetry.Config{
+		ServiceName:    "vergo",
+		ServiceVersion: version,
+	})
+	if err != nil {
+		log.Fatalf("telemetry init: %v", err)
+	}
+	defer func() {
+		if err := shutdownTelemetry(context.Background()); err != nil {
+			log.Printf("telemetry shutdown: %v", err)
+		}
+	}()
 
 	// Conecta ao banco de dados
 	log.Println("Conectando ao banco de dados...")
