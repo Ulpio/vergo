@@ -42,7 +42,7 @@ func (s *pgService) List(orgID string) ([]Project, error) {
 	var out []Project
 	for rows.Next() {
 		var p Project
-		if err := rows.Scan(&p.ID, &p.OrgID, &p.Name, &p.Description, &p.CreatedAt, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.OrgID, &p.Name, &p.Description, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
