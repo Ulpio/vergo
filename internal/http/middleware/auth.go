@@ -12,13 +12,18 @@ import (
 const ctxUserID = "user_id"
 
 func Auth(cfg config.Config) gin.HandlerFunc {
+	const prefix = "bearer "
 	return func(c *gin.Context) {
 		h := c.GetHeader("Authorization")
-		if h == "" || strings.HasPrefix(strings.ToLower(h), "Bearer") {
+		if !strings.HasPrefix(strings.ToLower(h), prefix) {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing_bearer"})
 			return
 		}
-		token := strings.TrimSpace(h[len("Bearer "):])
+		token := strings.TrimSpace(h[len(prefix):])
+		if token == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing_bearer"})
+			return
+		}
 		claims, err := auth.Parse(token, cfg.JWTAccessSecret)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
