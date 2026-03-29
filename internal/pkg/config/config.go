@@ -42,6 +42,11 @@ type Config struct {
 	// Rate limiting
 	RateLimitRPS   int // requests per second per key
 	RateLimitBurst int // max burst size
+
+	// Observability
+	OTLPEndpoint string // OTLP gRPC endpoint (e.g. localhost:4317)
+	OTLPInsecure bool   // use insecure connection (no TLS)
+	MetricsPort  int    // Prometheus /metrics scrape port (0 = disabled)
 }
 
 func getenv(key, def string) string {
@@ -118,5 +123,10 @@ func Load() Config {
 		// Rate limiting
 		RateLimitRPS:   getint("RATE_LIMIT_RPS", 20),
 		RateLimitBurst: getint("RATE_LIMIT_BURST", 40),
+
+		// Observability
+		OTLPEndpoint: getenv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+		OTLPInsecure: getbool("OTEL_EXPORTER_OTLP_INSECURE", true),
+		MetricsPort:  getint("METRICS_PORT", 0),
 	}
 }

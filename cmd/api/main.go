@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
 	"github.com/Ulpio/vergo/internal/http/middleware"
@@ -44,13 +45,19 @@ func main() {
 	slog.SetDefault(logger)
 
 	// Initialize OpenTelemetry (TracerProvider + MeterProvider)
-	shutdownTelemetry, err := telemetry.Init(context.Background(), telemetry.Config{
-		ServiceName:    "vergo",
-		ServiceVersion: version,
+	otelResult, err := telemetry.Init(context.Background(), telemetry.Config{
+		ServiceName:       "vergo",
+		ServiceVersion:    version,
+		OTLPEndpoint:      cfg.OTLPEndpoint,
+		OTLPInsecure:      cfg.OTLPInsecure,
+		PrometheusEnabled: cfg.MetricsPort > 0,
 	})
 	if err != nil {
 		slog.Error("telemetry init failed", "error", err)
 		os.Exit(1)
+	}
+	if cfg.OTLPEndpoint != "" {
+		slog.Info("otlp exporter enabled", "endpoint", cfg.OTLPEndpoint)
 	}
 
 	// Connect to database
@@ -112,6 +119,24 @@ func main() {
 		router.Register(api)
 	}
 
+	// Prometheus metrics server (separate port for scraping)
+	if cfg.MetricsPort > 0 && otelResult.PrometheusHandler != nil {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", promhttp.Handler())
+		metricsSrv := &http.Server{
+			Addr:         ":" + strconv.Itoa(cfg.MetricsPort),
+			Handler:      metricsMux,
+			ReadTimeout:  5 * time.Second,
+			WriteTimeout: 10 * time.Second,
+		}
+		go func() {
+			slog.Info("metrics server started", "port", cfg.MetricsPort)
+			if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				slog.Error("metrics server error", "error", err)
+			}
+		}()
+	}
+
 	// HTTP server
 	srv := &http.Server{
 		Addr:         ":" + strconv.Itoa(port),
@@ -136,7 +161,7 @@ func main() {
 	slog.Info("shutdown signal received", "signal", sig.String())
 
 	// Graceful shutdown: HTTP → telemetry → DB (ordered, not deferred)
-	gracefulShutdown(srv, shutdownTelemetry, database)
+	gracefulShutdown(srv, otelResult.Shutdown, database)
 }
 
 // gracefulShutdown drains in-flight requests, flushes telemetry, and closes
