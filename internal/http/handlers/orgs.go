@@ -25,6 +25,18 @@ type createOrgIn struct {
 	Name string `json:"name" binding:"required"`
 }
 
+// Create creates a new organization.
+// @Summary Create organization
+// @Tags Organizations
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param body body createOrgIn true "Organization name"
+// @Success 201 {object} org.Organization
+// @Failure 401 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /orgs [post]
 func (h *OrgsHandler) Create(c *gin.Context) {
 	uid, ok := middleware.UserID(c)
 	if !ok {
@@ -52,6 +64,15 @@ func (h *OrgsHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, o)
 }
 
+// Get returns an organization by ID.
+// @Summary Get organization
+// @Tags Organizations
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "Organization ID"
+// @Success 200 {object} org.Organization
+// @Failure 404 {object} ErrorResponse
+// @Router /orgs/{id} [get]
 func (h *OrgsHandler) Get(c *gin.Context) {
 	id := c.Param("id")
 	o, err := h.os.Get(id)
@@ -67,6 +88,21 @@ type memberIn struct {
 	Role   string `json:"role" binding:"required"` // owner|admin|member
 }
 
+// AddMember adds a user to an organization.
+// @Summary Add member
+// @Tags Organizations
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param id path string true "Organization ID"
+// @Param body body memberIn true "Member details"
+// @Success 204 "No Content"
+// @Failure 401 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /orgs/{id}/members [post]
 func (h *OrgsHandler) AddMember(c *gin.Context) {
 	orgID := c.Param("id")
 	actorID, _ := middleware.UserID(c)
@@ -90,6 +126,22 @@ func (h *OrgsHandler) AddMember(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// UpdateMember changes a member's role.
+// @Summary Update member role
+// @Tags Organizations
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param id path string true "Organization ID"
+// @Param userId path string true "User ID"
+// @Param body body memberIn true "New role"
+// @Success 204 "No Content"
+// @Failure 401 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
+// @Failure 404 {object} ErrorDetailResponse
+// @Failure 422 {object} ErrorResponse
+// @Router /orgs/{id}/members/{userId} [patch]
 func (h *OrgsHandler) UpdateMember(c *gin.Context) {
 	orgID := c.Param("id")
 	userID := c.Param("userID")
@@ -116,6 +168,19 @@ func (h *OrgsHandler) UpdateMember(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// RemoveMember removes a user from an organization.
+// @Summary Remove member
+// @Tags Organizations
+// @Security BearerAuth
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param id path string true "Organization ID"
+// @Param userId path string true "User ID"
+// @Success 204 "No Content"
+// @Failure 401 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
+// @Failure 404 {object} ErrorDetailResponse
+// @Router /orgs/{id}/members/{userId} [delete]
 func (h *OrgsHandler) RemoveMember(c *gin.Context) {
 	orgID := c.Param("id")
 	userID := c.Param("userID")
@@ -136,6 +201,18 @@ func (h *OrgsHandler) RemoveMember(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// Delete removes an organization (owner only).
+// @Summary Delete organization
+// @Tags Organizations
+// @Security BearerAuth
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param id path string true "Organization ID"
+// @Success 204 "No Content"
+// @Failure 401 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
+// @Failure 404 {object} ErrorDetailResponse
+// @Router /orgs/{id} [delete]
 func (h *OrgsHandler) Delete(c *gin.Context) {
 	orgID := c.Param("id")
 	actorID, _ := middleware.UserID(c)

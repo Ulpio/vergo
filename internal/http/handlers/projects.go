@@ -20,6 +20,17 @@ func NewProjectsHandler(ps project.Service, as audit.Service) *ProjectsHandler {
 	return &ProjectsHandler{ps: ps, as: as}
 }
 
+// List returns all projects in the organization.
+// @Summary List projects
+// @Tags Projects
+// @Security BearerAuth
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Success 200 {object} map[string][]project.Project "items"
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorDetailResponse
+// @Router /projects [get]
 func (h *ProjectsHandler) List(c *gin.Context) {
 	orgID, ok := middleware.OrgID(c)
 	if !ok {
@@ -39,6 +50,20 @@ type ProjectIn struct {
 	Description string `json:"description"`
 }
 
+// Create creates a new project.
+// @Summary Create project
+// @Tags Projects
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param body body ProjectIn true "Project data"
+// @Success 201 {object} project.Project
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Failure 500 {object} ErrorDetailResponse
+// @Router /projects [post]
 func (h *ProjectsHandler) Create(c *gin.Context) {
 	orgID, ok := middleware.OrgID(c)
 	if !ok {
@@ -69,6 +94,17 @@ func (h *ProjectsHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, p)
 }
 
+// Get returns a project by ID.
+// @Summary Get project
+// @Tags Projects
+// @Security BearerAuth
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param id path string true "Project ID"
+// @Success 200 {object} project.Project
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /projects/{id} [get]
 func (h *ProjectsHandler) Get(c *gin.Context) {
 	orgID, ok := middleware.OrgID(c)
 	if !ok {
@@ -84,6 +120,21 @@ func (h *ProjectsHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, p)
 }
 
+// Update modifies a project.
+// @Summary Update project
+// @Tags Projects
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param id path string true "Project ID"
+// @Param body body ProjectIn true "Updated project data"
+// @Success 200 {object} project.Project
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Failure 500 {object} ErrorDetailResponse
+// @Router /projects/{id} [patch]
 func (h *ProjectsHandler) Update(c *gin.Context) {
 	orgID, ok := middleware.OrgID(c)
 	if !ok {
@@ -118,6 +169,17 @@ func (h *ProjectsHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, p)
 }
 
+// Delete removes a project.
+// @Summary Delete project
+// @Tags Projects
+// @Security BearerAuth
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param id path string true "Project ID"
+// @Success 204 "No Content"
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /projects/{id} [delete]
 func (h *ProjectsHandler) Delete(c *gin.Context) {
 	orgID, ok := middleware.OrgID(c)
 	if !ok {
