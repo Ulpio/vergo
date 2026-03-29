@@ -1,0 +1,56 @@
+{
+  "name": "Vergo",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.25"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg",
+        "eamodio.gitlens",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "go.useLanguageServer": true,
+        "go.lintTool": "golangci-lint",
+        "go.lintFlags": ["--fast"],
+        "editor.formatOnSave": true,
+        "[go]": {
+          "editor.defaultFormatter": "golang.go"
+        }
+      }
+    }
+  },
+
+  "postCreateCommand": ".devcontainer/post-create.sh",
+
+  "forwardPorts": [8080, 5432, 16686, 9090, 9091],
+  "portsAttributes": {
+    "8080": { "label": "Vergo API" },
+    "5432": { "label": "PostgreSQL" },
+    "16686": { "label": "Jaeger UI" },
+    "9090": { "label": "Prometheus" },
+    "9091": { "label": "Metrics" }
+  },
+
+  "remoteEnv": {
+    "DB_HOST": "db",
+    "DB_PORT": "5432",
+    "DB_USER": "app",
+    "DB_PASSWORD": "app",
+    "DB_NAME": "vergo",
+    "DB_SSLMODE": "disable",
+    "APP_ENV": "development"
+  }
+}
