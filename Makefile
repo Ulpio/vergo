@@ -1,4 +1,4 @@
-.PHONY: help run dev build test test-integration test-fuzz lint fmt vet generate clean \
+.PHONY: help run dev build test test-integration test-fuzz lint fmt vet generate swagger swagger-check clean \
        docker-up docker-down docker-reset \
        migrate-sync migrate-up migrate-down migrate-create deps
 
@@ -51,6 +51,13 @@ vet: ## Run go vet
 
 generate: ## Run go generate
 	go generate ./...
+
+swagger: ## Regenerate Swagger docs
+	@command -v swag >/dev/null 2>&1 || { echo "Installing swag..."; go install github.com/swaggo/swag/cmd/swag@latest; }
+	swag init -g cmd/api/main.go -o docs/swagger --parseDependency --parseInternal
+
+swagger-check: swagger ## Verify Swagger docs are up-to-date (CI)
+	@git diff --exit-code docs/swagger/ || (echo "Swagger docs are out of date. Run 'make swagger' and commit." && exit 1)
 
 check: vet lint test ## Run vet + lint + test (CI equivalent)
 

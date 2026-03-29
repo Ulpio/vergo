@@ -66,3 +66,35 @@ jobs:
 
       - name: Lint migrations
         run: sqlfluff lint db/migrations/ --dialect postgres
+
+  swagger-check:
+    name: Swagger Docs Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.x'
+          check-latest: true
+
+      - name: Cache Go modules
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install swag
+        run: go install github.com/swaggo/swag/cmd/swag@latest
+
+      - name: Check Swagger docs are up-to-date
+        run: |
+          swag init -g cmd/api/main.go -o docs/swagger --parseDependency --parseInternal
+          git diff --exit-code docs/swagger/ || (echo "::error::Swagger docs are out of date. Run 'make swagger' and commit." && exit 1)
