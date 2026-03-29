@@ -16,6 +16,15 @@ type MeHandler struct {
 
 func NewMeHandler(us user.Service, os org.Service) *MeHandler { return &MeHandler{us: us, os: os} }
 
+// Get returns the authenticated user's profile.
+// @Summary Get current user
+// @Tags User
+// @Security BearerAuth
+// @Produce json
+// @Param X-Org-ID header string false "Organization ID (optional, adds role)"
+// @Success 200 {object} MeResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /me [get]
 func (h *MeHandler) Get(c *gin.Context) {
 	uid, ok := middleware.UserID(c)
 	if !ok || uid == "" {

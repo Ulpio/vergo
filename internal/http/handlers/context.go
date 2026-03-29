@@ -18,6 +18,16 @@ func NewContextHandler(cs userctx.Service, os org.Service) *ContextHandler {
 	return &ContextHandler{cs: cs, os: os}
 }
 
+// Get returns the user's active organization context.
+// @Summary Get active org context
+// @Tags Context
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} ContextResponse
+// @Success 204 "No active context"
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorDetailResponse
+// @Router /context [get]
 func (h *ContextHandler) Get(c *gin.Context) {
 	uid, ok := middleware.UserID(c)
 	if !ok {
@@ -43,6 +53,19 @@ type setContectIn struct {
 	OrgID string `json:"org_id" binding:"required"`
 }
 
+// Set updates the user's active organization context.
+// @Summary Set active org context
+// @Tags Context
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param body body setContectIn true "Organization to activate"
+// @Success 204 "No Content"
+// @Failure 401 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Failure 500 {object} ErrorDetailResponse
+// @Router /context [post]
 func (h *ContextHandler) Set(c *gin.Context) {
 	uid, ok := middleware.UserID(c)
 	if !ok {

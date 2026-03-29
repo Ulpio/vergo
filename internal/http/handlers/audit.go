@@ -16,6 +16,25 @@ type AuditHandler struct {
 
 func NewAuditHandler(as audit.Service) *AuditHandler { return &AuditHandler{as: as} }
 
+// List returns audit log events for the organization.
+// @Summary List audit events
+// @Tags Audit
+// @Security BearerAuth
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param page query int false "Page number" default(1)
+// @Param page_size query int false "Items per page (max 100)" default(20)
+// @Param actor_id query string false "Filter by actor"
+// @Param action query string false "Filter by action"
+// @Param entity query string false "Filter by entity type"
+// @Param since query string false "Filter from date (RFC3339)"
+// @Param until query string false "Filter to date (RFC3339)"
+// @Success 200 {object} map[string]interface{} "items, page, page_size, next_offset"
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /audit [get]
 func (h *AuditHandler) List(c *gin.Context) {
 	orgID, ok := middleware.OrgID(c)
 	if !ok || orgID == "" {
