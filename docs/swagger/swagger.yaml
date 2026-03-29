@@ -1,11 +1,1199 @@
 basePath: /v1
+definitions:
+  github_com_Ulpio_vergo_internal_domain_file.File:
+    properties:
+      bucket:
+        type: string
+      content_type:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      metadata:
+        description: map[string]any serializado em JSONB
+      object_key:
+        type: string
+      org_id:
+        type: string
+      size_bytes:
+        type: integer
+      uploaded_by:
+        type: string
+    type: object
+  github_com_Ulpio_vergo_internal_domain_org.Organization:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      owner_user_id:
+        type: string
+    type: object
+  github_com_Ulpio_vergo_internal_domain_project.Project:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      org_id:
+        type: string
+      updated_by:
+        type: string
+    type: object
+  internal_http_handlers.AuthResponse:
+    description: Authentication response with tokens
+    properties:
+      access_token:
+        example: eyJhbGciOiJIUzI1NiIs...
+        type: string
+      refresh_token:
+        example: eyJhbGciOiJIUzI1NiIs...
+        type: string
+      user:
+        $ref: '#/definitions/internal_http_handlers.AuthUser'
+    type: object
+  internal_http_handlers.AuthUser:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
+  internal_http_handlers.ContextResponse:
+    description: Active organization context
+    properties:
+      org_id:
+        example: org-uuid
+        type: string
+      role:
+        example: admin
+        type: string
+    type: object
+  internal_http_handlers.ErrorDetailResponse:
+    description: Error response with detail
+    properties:
+      detail:
+        example: duplicate key
+        type: string
+      error:
+        example: create_fail
+        type: string
+    type: object
+  internal_http_handlers.ErrorResponse:
+    description: Standard error response
+    properties:
+      error:
+        example: not_found
+        type: string
+    type: object
+  internal_http_handlers.MeResponse:
+    description: Current user info
+    properties:
+      user:
+        $ref: '#/definitions/internal_http_handlers.MeUser'
+    type: object
+  internal_http_handlers.MeUser:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      org_id:
+        example: org-uuid
+        type: string
+      role:
+        example: admin
+        type: string
+    type: object
+  internal_http_handlers.PresignGetResponse:
+    description: Presigned download URL
+    properties:
+      method:
+        example: GET
+        type: string
+      url:
+        example: https://s3.amazonaws.com/bucket/key?...
+        type: string
+    type: object
+  internal_http_handlers.PresignPutResponse:
+    description: Presigned upload URL
+    properties:
+      headers:
+        additionalProperties:
+          type: string
+        type: object
+      method:
+        example: PUT
+        type: string
+      url:
+        example: https://s3.amazonaws.com/bucket/key?...
+        type: string
+    type: object
+  internal_http_handlers.ProjectIn:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  internal_http_handlers.TokenResponse:
+    description: Refreshed token pair
+    properties:
+      access_token:
+        example: eyJhbGciOiJIUzI1NiIs...
+        type: string
+      refresh_token:
+        example: eyJhbGciOiJIUzI1NiIs...
+        type: string
+    type: object
+  internal_http_handlers.createOrgIn:
+    properties:
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  internal_http_handlers.creds:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  internal_http_handlers.fileCreateIn:
+    properties:
+      bucket:
+        type: string
+      content_type:
+        type: string
+      key:
+        type: string
+      metadata: {}
+      size_bytes:
+        type: integer
+    required:
+    - key
+    type: object
+  internal_http_handlers.memberIn:
+    properties:
+      role:
+        description: owner|admin|member
+        type: string
+      user_id:
+        type: string
+    required:
+    - role
+    - user_id
+    type: object
+  internal_http_handlers.presignGetIn:
+    properties:
+      bucket:
+        type: string
+      expires:
+        type: integer
+      key:
+        type: string
+    required:
+    - key
+    type: object
+  internal_http_handlers.presignPutIn:
+    properties:
+      bucket:
+        type: string
+      content_type:
+        type: string
+      expires:
+        type: integer
+      key:
+        type: string
+    required:
+    - content_type
+    - key
+    type: object
+  internal_http_handlers.refreshReq:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  internal_http_handlers.setContectIn:
+    properties:
+      org_id:
+        type: string
+    required:
+    - org_id
+    type: object
 host: localhost:8080
 info:
   contact: {}
   description: Multi-tenant SaaS boilerplate API with JWT auth, RBAC, and S3 storage.
   title: Vergo API
   version: 0.1.0
-paths: {}
+paths:
+  /audit:
+    get:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page (max 100)
+        in: query
+        name: page_size
+        type: integer
+      - description: Filter by actor
+        in: query
+        name: actor_id
+        type: string
+      - description: Filter by action
+        in: query
+        name: action
+        type: string
+      - description: Filter by entity type
+        in: query
+        name: entity
+        type: string
+      - description: Filter from date (RFC3339)
+        in: query
+        name: since
+        type: string
+      - description: Filter to date (RFC3339)
+        in: query
+        name: until
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: items, page, page_size, next_offset
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List audit events
+      tags:
+      - Audit
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: User credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.creds'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_http_handlers.AuthResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      summary: Authenticate user
+      tags:
+      - Auth
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token to revoke
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.refreshReq'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      summary: Revoke refresh token
+      tags:
+      - Auth
+  /auth/logout-all:
+    post:
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Revoke all refresh tokens
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.refreshReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_http_handlers.TokenResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      summary: Refresh access token
+      tags:
+      - Auth
+  /auth/signup:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: User credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.creds'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_http_handlers.AuthResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      summary: Register a new user
+      tags:
+      - Auth
+  /context:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ContextResponse'
+        "204":
+          description: No active context
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      summary: Get active org context
+      tags:
+      - Context
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization to activate
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.setContectIn'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      summary: Set active org context
+      tags:
+      - Context
+  /me:
+    get:
+      parameters:
+      - description: Organization ID (optional, adds role)
+        in: header
+        name: X-Org-ID
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_http_handlers.MeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - User
+  /orgs:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization name
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.createOrgIn'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_Ulpio_vergo_internal_domain_org.Organization'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create organization
+      tags:
+      - Organizations
+  /orgs/{id}:
+    delete:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete organization
+      tags:
+      - Organizations
+    get:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Ulpio_vergo_internal_domain_org.Organization'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get organization
+      tags:
+      - Organizations
+  /orgs/{id}/members:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.memberIn'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add member
+      tags:
+      - Organizations
+  /orgs/{id}/members/{userId}:
+    delete:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove member
+      tags:
+      - Organizations
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: New role
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.memberIn'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorDetailResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update member role
+      tags:
+      - Organizations
+  /projects:
+    get:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: items
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/github_com_Ulpio_vergo_internal_domain_project.Project'
+              type: array
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      summary: List projects
+      tags:
+      - Projects
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Project data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.ProjectIn'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_Ulpio_vergo_internal_domain_project.Project'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      summary: Create project
+      tags:
+      - Projects
+  /projects/{id}:
+    delete:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete project
+      tags:
+      - Projects
+    get:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Ulpio_vergo_internal_domain_project.Project'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get project
+      tags:
+      - Projects
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated project data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.ProjectIn'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Ulpio_vergo_internal_domain_project.Project'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      summary: Update project
+      tags:
+      - Projects
+  /storage/files:
+    get:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - default: 20
+        description: Items per page (max 100)
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: items, next_offset
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List files
+      tags:
+      - Storage
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: File metadata
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.fileCreateIn'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_Ulpio_vergo_internal_domain_file.File'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Register uploaded file
+      tags:
+      - Storage
+  /storage/files/{id}:
+    delete:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete file
+      tags:
+      - Storage
+    get:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Ulpio_vergo_internal_domain_file.File'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get file
+      tags:
+      - Storage
+  /storage/presign:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Upload parameters
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.presignPutIn'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_http_handlers.PresignPutResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      summary: Get presigned upload URL
+      tags:
+      - Storage
+  /storage/presign-download:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Download parameters
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.presignGetIn'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_http_handlers.PresignGetResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      summary: Get presigned download URL
+      tags:
+      - Storage
 securityDefinitions:
   BearerAuth:
     description: Bearer token (e.g. "Bearer eyJhbG...")

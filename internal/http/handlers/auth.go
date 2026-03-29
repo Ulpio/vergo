@@ -26,6 +26,17 @@ type creds struct {
 	Password string `json:"password" binding:"required,min=6"`
 }
 
+// Signup registers a new user.
+// @Summary Register a new user
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body creds true "User credentials"
+// @Success 201 {object} AuthResponse
+// @Failure 409 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /auth/signup [post]
 func (h *AuthHandler) Signup(c *gin.Context) {
 	var in creds
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -61,6 +72,17 @@ func (h *AuthHandler) Signup(c *gin.Context) {
 	})
 }
 
+// Login authenticates a user and returns tokens.
+// @Summary Authenticate user
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body creds true "User credentials"
+// @Success 200 {object} AuthResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var in creds
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -100,6 +122,17 @@ type refreshReq struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
+// Refresh rotates the token pair.
+// @Summary Refresh access token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body refreshReq true "Refresh token"
+// @Success 200 {object} TokenResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /auth/refresh [post]
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var in refreshReq
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -144,6 +177,16 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	})
 }
 
+// Logout revokes a specific refresh token.
+// @Summary Revoke refresh token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body refreshReq true "Refresh token to revoke"
+// @Success 204 "No Content"
+// @Failure 401 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Router /auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
 	var in refreshReq
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -159,6 +202,13 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// LogoutAll revokes all refresh tokens for the authenticated user.
+// @Summary Revoke all refresh tokens
+// @Tags Auth
+// @Security BearerAuth
+// @Success 204 "No Content"
+// @Failure 401 {object} ErrorResponse
+// @Router /auth/logout-all [post]
 func (h *AuthHandler) LogoutAll(c *gin.Context) {
 	uid, ok := middlewareUserID(c) // helper local para evitar import cycle
 	if !ok {
