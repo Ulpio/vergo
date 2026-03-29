@@ -1,4 +1,3 @@
-
 CREATE TABLE IF NOT EXISTS audit_logs (
   id BIGSERIAL PRIMARY KEY,
   org_id TEXT NOT NULL,
@@ -9,5 +8,5 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_audit_org ON audit_logs(org_id);
-CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_org ON audit_logs (org_id);
+CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs (actor_id);

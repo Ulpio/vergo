@@ -1,0 +1,20 @@
+[sqlfluff]
+dialect = postgres
+templater = raw
+max_line_length = 120
+# LT12: files must end with newline (handled by editors)
+# RF04: keywords as identifiers (we use "name", "action" etc. as column names)
+exclude_rules = LT12, RF04
+
+[sqlfluff:indentation]
+indent_unit = space
+tab_space_size = 2
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = consistent
+
+[sqlfluff:rules:capitalisation.types]
+extended_capitalisation_policy = consistent
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = consistent

@@ -45,5 +45,24 @@ jobs:
       - name: Build
         run: go build ./...
 
-      # - name: Test
-      #   run: go test ./... -cover
+      - name: Test
+        run: go test ./... -count=1
+
+  lint-sql:
+    name: Lint SQL Migrations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install sqlfluff
+        run: pip install sqlfluff
+
+      - name: Lint migrations
+        run: sqlfluff lint db/migrations/ --dialect postgres
