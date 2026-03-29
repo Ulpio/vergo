@@ -4,14 +4,49 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+      day: "monday"
+    open-pull-requests-limit: 10
     commit-message:
       prefix: "deps"
+    labels:
+      - "dependencies"
+      - "go"
+    groups:
+      aws-sdk:
+        patterns:
+          - "github.com/aws/aws-sdk-go-v2*"
+        update-types:
+          - "minor"
+          - "patch"
+      otel:
+        patterns:
+          - "go.opentelemetry.io/*"
+        update-types:
+          - "minor"
+          - "patch"
+      golang-x:
+        patterns:
+          - "golang.org/x/*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "deps"
+    labels:
+      - "dependencies"
+      - "github_actions"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
