@@ -20,6 +20,7 @@ import (
 	"github.com/Ulpio/vergo/internal/pkg/config"
 	"github.com/Ulpio/vergo/internal/pkg/db"
 	"github.com/Ulpio/vergo/internal/pkg/logging"
+	"github.com/Ulpio/vergo/internal/pkg/ratelimit"
 	"github.com/Ulpio/vergo/internal/pkg/telemetry"
 )
 
@@ -81,9 +82,14 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	// Rate limiter (in-memory token bucket)
+	limiter := ratelimit.New(float64(cfg.RateLimitRPS), cfg.RateLimitBurst)
+	defer limiter.Stop()
+
 	r := gin.New()
 	r.Use(middleware.Recover())
 	r.Use(otelgin.Middleware("vergo"))
+	r.Use(middleware.RateLimit(limiter))
 	r.Use(middleware.Logging())
 
 	// Health endpoints

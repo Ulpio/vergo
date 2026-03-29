@@ -38,6 +38,10 @@ type Config struct {
 	// Storage policy (opcional)
 	StorageAllowedTypes []string
 	StorageMaxMB        int
+
+	// Rate limiting
+	RateLimitRPS   int // requests per second per key
+	RateLimitBurst int // max burst size
 }
 
 func getenv(key, def string) string {
@@ -110,5 +114,9 @@ func Load() Config {
 		// Storage policy
 		StorageAllowedTypes: splitCSV(getenv("STORAGE_ALLOWED_TYPES", "")),
 		StorageMaxMB:        getint("STORAGE_MAX_MB", 25),
+
+		// Rate limiting
+		RateLimitRPS:   getint("RATE_LIMIT_RPS", 20),
+		RateLimitBurst: getint("RATE_LIMIT_BURST", 40),
 	}
 }
