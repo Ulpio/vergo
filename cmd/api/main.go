@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"os"
@@ -23,6 +24,8 @@ import (
 	"github.com/Ulpio/vergo/internal/pkg/telemetry"
 )
 
+const shutdownTimeout = 30 * time.Second
+
 func init() {
 	if err := godotenv.Load(); err != nil {
 		_ = err
@@ -40,8 +43,7 @@ func main() {
 	slog.SetDefault(logger)
 
 	// Initialize OpenTelemetry (TracerProvider + MeterProvider)
-	ctx := context.Background()
-	shutdownTelemetry, err := telemetry.Init(ctx, telemetry.Config{
+	shutdownTelemetry, err := telemetry.Init(context.Background(), telemetry.Config{
 		ServiceName:    "vergo",
 		ServiceVersion: version,
 	})
@@ -49,11 +51,6 @@ func main() {
 		slog.Error("telemetry init failed", "error", err)
 		os.Exit(1)
 	}
-	defer func() {
-		if err := shutdownTelemetry(context.Background()); err != nil {
-			slog.Error("telemetry shutdown failed", "error", err)
-		}
-	}()
 
 	// Connect to database
 	slog.Info("connecting to database")
@@ -62,7 +59,6 @@ func main() {
 		slog.Error("database connection failed", "error", err)
 		os.Exit(1)
 	}
-	defer database.Close()
 
 	if err := database.Ping(); err != nil {
 		slog.Error("database ping failed", "error", err)
@@ -110,12 +106,12 @@ func main() {
 		router.Register(api)
 	}
 
-	// HTTP server with graceful shutdown
+	// HTTP server
 	srv := &http.Server{
 		Addr:         ":" + strconv.Itoa(port),
 		Handler:      r,
 		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 20 * time.Second,
+		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
@@ -127,16 +123,45 @@ func main() {
 		}
 	}()
 
+	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	slog.Info("shutting down")
+	sig := <-quit
+	slog.Info("shutdown signal received", "signal", sig.String())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Graceful shutdown: HTTP → telemetry → DB (ordered, not deferred)
+	gracefulShutdown(srv, shutdownTelemetry, database)
+}
+
+// gracefulShutdown drains in-flight requests, flushes telemetry, and closes
+// the database connection pool in a deterministic order.
+func gracefulShutdown(srv *http.Server, shutdownTelemetry func(context.Context) error, database *sql.DB) {
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
+
+	// 1. Drain HTTP connections (in-flight requests complete up to timeout)
+	slog.Info("draining http connections", "timeout", shutdownTimeout.String())
 	if err := srv.Shutdown(ctx); err != nil {
-		slog.Error("forced shutdown", "error", err)
-		os.Exit(1)
+		slog.Error("http shutdown error", "error", err)
+	} else {
+		slog.Info("http server stopped")
 	}
-	slog.Info("server stopped")
+
+	// 2. Flush telemetry spans and metrics
+	slog.Info("flushing telemetry")
+	if err := shutdownTelemetry(ctx); err != nil {
+		slog.Error("telemetry flush error", "error", err)
+	} else {
+		slog.Info("telemetry flushed")
+	}
+
+	// 3. Close database connection pool
+	slog.Info("closing database connections")
+	if err := database.Close(); err != nil {
+		slog.Error("database close error", "error", err)
+	} else {
+		slog.Info("database connections closed")
+	}
+
+	slog.Info("shutdown complete")
 }
