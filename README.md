@@ -38,6 +38,17 @@ Para subir Postgres + PgAdmin:
 docker compose up -d db pgadmin
 ```
 
+### Dev Container (VS Code / Cursor)
+
+Open the project in a ready-to-code environment with Go, PostgreSQL, and all tools pre-installed:
+
+1. Install the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension
+2. Open the project folder → **Ctrl+Shift+P** → *"Dev Containers: Reopen in Container"*
+3. Wait for the container to build (first time only, ~2 min)
+
+The container includes: Go 1.25, PostgreSQL 16, `migrate`, `golangci-lint`, `swag`, `air`, `sqlfluff`.
+Ports forwarded: API (8080), PostgreSQL (5432), Jaeger (16686), Prometheus (9090).
+
 ---
 
 ## 🧱 Estrutura do projeto
