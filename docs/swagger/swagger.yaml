@@ -1,0 +1,15 @@
+basePath: /v1
+host: localhost:8080
+info:
+  contact: {}
+  description: Multi-tenant SaaS boilerplate API with JWT auth, RBAC, and S3 storage.
+  title: Vergo API
+  version: 0.1.0
+paths: {}
+securityDefinitions:
+  BearerAuth:
+    description: Bearer token (e.g. "Bearer eyJhbG...")
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

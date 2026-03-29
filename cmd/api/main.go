@@ -15,8 +15,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
+	_ "github.com/Ulpio/vergo/docs/swagger"
 	"github.com/Ulpio/vergo/internal/http/middleware"
 	"github.com/Ulpio/vergo/internal/http/router"
 	"github.com/Ulpio/vergo/internal/pkg/config"
@@ -33,6 +36,18 @@ func init() {
 		_ = err
 	}
 }
+
+// @title Vergo API
+// @version 0.1.0
+// @description Multi-tenant SaaS boilerplate API with JWT auth, RBAC, and S3 storage.
+
+// @host localhost:8080
+// @BasePath /v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Bearer token (e.g. "Bearer eyJhbG...")
 
 func main() {
 	cfg := config.Load()
@@ -108,6 +123,11 @@ func main() {
 	r.GET("/readyz", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
+
+	// Swagger UI (non-production only)
+	if cfg.AppEnv != "production" {
+		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
 
 	// API v1
 	api := r.Group("/v1")
