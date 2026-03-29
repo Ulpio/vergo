@@ -7,48 +7,61 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Config holds optional settings for telemetry initialization.
 type Config struct {
 	ServiceName    string
 	ServiceVersion string
-	TraceWriter    io.Writer // nil = discard (e.g. when OTLP is used)
-	MetricWriter   io.Writer // nil = discard
+	TraceWriter    io.Writer // nil = discard (used when no OTLP endpoint)
+	MetricWriter   io.Writer // nil = discard (used when Prometheus is disabled)
+
+	// OTLP exporter settings (empty = use stdout fallback)
+	OTLPEndpoint string // gRPC endpoint, e.g. "localhost:4317"
+	OTLPInsecure bool   // use insecure connection (no TLS)
+
+	// Prometheus metrics (when enabled, exposes /metrics for scraping)
+	PrometheusEnabled bool
 }
 
-// Init initializes the global TracerProvider and MeterProvider with stdout
-// exporters (or custom writers). Returns a shutdown function that must be
-// called before process exit to flush and shut down both providers.
-func Init(ctx context.Context, cfg Config) (shutdown func(context.Context) error, err error) {
+// Result holds references needed after Init (e.g. Prometheus handler).
+type Result struct {
+	Shutdown          func(context.Context) error
+	PrometheusHandler *prometheus.Exporter // nil when Prometheus is disabled
+}
+
+// Init initializes the global TracerProvider and MeterProvider.
+// When OTLPEndpoint is set, traces are exported via OTLP gRPC (e.g. to Jaeger).
+// When PrometheusEnabled is true, metrics are exposed via a Prometheus scrape endpoint.
+// Falls back to stdout exporters when neither is configured.
+func Init(ctx context.Context, cfg Config) (*Result, error) {
 	if cfg.ServiceName == "" {
 		cfg.ServiceName = "vergo"
 	}
-	res, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
 			semconv.ServiceName(cfg.ServiceName),
 			semconv.ServiceVersion(cfg.ServiceVersion),
 		),
+		resource.WithProcessRuntimeDescription(),
+		resource.WithHost(),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	// TracerProvider
-	var traceExp sdktrace.SpanExporter
-	if cfg.TraceWriter != nil {
-		traceExp, err = stdouttrace.New(stdouttrace.WithWriter(cfg.TraceWriter))
-	} else {
-		traceExp, err = stdouttrace.New(stdouttrace.WithWriter(io.Discard))
-	}
+	// --- TracerProvider ---
+	traceExp, err := newTraceExporter(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -62,26 +75,15 @@ func Init(ctx context.Context, cfg Config) (shutdown func(context.Context) error
 	)
 	otel.SetTracerProvider(tp)
 
-	// MeterProvider
-	var metricExp metric.Exporter
-	if cfg.MetricWriter != nil {
-		metricExp, err = stdoutmetric.New(stdoutmetric.WithWriter(cfg.MetricWriter))
-	} else {
-		metricExp, err = stdoutmetric.New(stdoutmetric.WithWriter(io.Discard))
-	}
+	// --- MeterProvider ---
+	mp, promExporter, err := newMeterProvider(res, cfg)
 	if err != nil {
 		_ = tp.Shutdown(ctx)
 		return nil, err
 	}
-	mp := metric.NewMeterProvider(
-		metric.WithResource(res),
-		metric.WithReader(metric.NewPeriodicReader(metricExp,
-			metric.WithInterval(10*time.Second),
-		)),
-	)
 	otel.SetMeterProvider(mp)
 
-	shutdown = func(ctx context.Context) error {
+	shutdown := func(ctx context.Context) error {
 		shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		var firstErr error
@@ -93,5 +95,64 @@ func Init(ctx context.Context, cfg Config) (shutdown func(context.Context) error
 		}
 		return firstErr
 	}
-	return shutdown, nil
+
+	return &Result{
+		Shutdown:          shutdown,
+		PrometheusHandler: promExporter,
+	}, nil
+}
+
+// newTraceExporter returns an OTLP gRPC exporter when endpoint is set,
+// otherwise falls back to stdout.
+func newTraceExporter(ctx context.Context, cfg Config) (sdktrace.SpanExporter, error) {
+	if cfg.OTLPEndpoint != "" {
+		opts := []otlptracegrpc.Option{
+			otlptracegrpc.WithEndpoint(cfg.OTLPEndpoint),
+		}
+		if cfg.OTLPInsecure {
+			opts = append(opts, otlptracegrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())))
+			opts = append(opts, otlptracegrpc.WithInsecure())
+		}
+		return otlptracegrpc.New(ctx, opts...)
+	}
+
+	// Fallback: stdout (discard when no writer)
+	w := cfg.TraceWriter
+	if w == nil {
+		w = io.Discard
+	}
+	return stdouttrace.New(stdouttrace.WithWriter(w))
+}
+
+// newMeterProvider returns a MeterProvider with Prometheus exporter when enabled,
+// otherwise falls back to stdout periodic reader.
+func newMeterProvider(res *resource.Resource, cfg Config) (*metric.MeterProvider, *prometheus.Exporter, error) {
+	if cfg.PrometheusEnabled {
+		promExporter, err := prometheus.New()
+		if err != nil {
+			return nil, nil, err
+		}
+		mp := metric.NewMeterProvider(
+			metric.WithResource(res),
+			metric.WithReader(promExporter),
+		)
+		return mp, promExporter, nil
+	}
+
+	// Fallback: stdout periodic reader
+	w := cfg.MetricWriter
+	if w == nil {
+		w = io.Discard
+	}
+	metricExp, err := stdoutmetric.New(stdoutmetric.WithWriter(w))
+	if err != nil {
+		return nil, nil, err
+	}
+	mp := metric.NewMeterProvider(
+		metric.WithResource(res),
+		metric.WithReader(metric.NewPeriodicReader(metricExp,
+			metric.WithInterval(10*time.Second),
+		)),
+	)
+	return mp, nil, nil
 }
