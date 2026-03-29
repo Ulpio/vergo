@@ -40,7 +40,7 @@ func Register(v1 *gin.RouterGroup) {
 
 	// Handler
 	authH := handlers.NewAuthHandler(cfg, userSvc, rfStore)
-	orgH := handlers.NewOrgsHandler(orgSvc)
+	orgH := handlers.NewOrgsHandler(orgSvc, auditSvc)
 	projH := handlers.NewProjectsHandler(projSvc, auditSvc)
 	meH := handlers.NewMeHandler(userSvc, orgSvc)
 	auditH := handlers.NewAuditHandler(auditSvc)
