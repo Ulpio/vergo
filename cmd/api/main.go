@@ -3,7 +3,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,10 +15,11 @@ import (
 	"github.com/joho/godotenv"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
-	// importa o router do projeto
+	"github.com/Ulpio/vergo/internal/http/middleware"
 	"github.com/Ulpio/vergo/internal/http/router"
 	"github.com/Ulpio/vergo/internal/pkg/config"
 	"github.com/Ulpio/vergo/internal/pkg/db"
+	"github.com/Ulpio/vergo/internal/pkg/logging"
 	"github.com/Ulpio/vergo/internal/pkg/telemetry"
 )
 
@@ -29,45 +30,51 @@ func init() {
 }
 
 func main() {
-	// Carrega configurações
 	cfg := config.Load()
 	port := cfg.AppPort
 	env := cfg.AppEnv
 	version := cfg.AppVersion
 
-	// Inicializa OpenTelemetry (TracerProvider + MeterProvider)
+	// Initialize structured logger
+	logger := logging.New(env)
+	slog.SetDefault(logger)
+
+	// Initialize OpenTelemetry (TracerProvider + MeterProvider)
 	ctx := context.Background()
 	shutdownTelemetry, err := telemetry.Init(ctx, telemetry.Config{
 		ServiceName:    "vergo",
 		ServiceVersion: version,
 	})
 	if err != nil {
-		log.Fatalf("telemetry init: %v", err)
+		slog.Error("telemetry init failed", "error", err)
+		os.Exit(1)
 	}
 	defer func() {
 		if err := shutdownTelemetry(context.Background()); err != nil {
-			log.Printf("telemetry shutdown: %v", err)
+			slog.Error("telemetry shutdown failed", "error", err)
 		}
 	}()
 
-	// Conecta ao banco de dados
-	log.Println("Conectando ao banco de dados...")
+	// Connect to database
+	slog.Info("connecting to database")
 	database, err := db.Open(cfg)
 	if err != nil {
-		log.Fatalf("Erro ao conectar ao banco: %v", err)
+		slog.Error("database connection failed", "error", err)
+		os.Exit(1)
 	}
 	defer database.Close()
 
-	// Testa a conexão
 	if err := database.Ping(); err != nil {
-		log.Fatalf("Erro ao fazer ping no banco: %v", err)
+		slog.Error("database ping failed", "error", err)
+		os.Exit(1)
 	}
-	log.Println("Conexão com o banco estabelecida")
+	slog.Info("database connection established")
 
-	// Executa migrations
-	log.Println("🚀 Executando migrations...")
+	// Run migrations
+	slog.Info("running migrations")
 	if err := db.RunMigrations(database); err != nil {
-		log.Fatalf("Erro ao executar migrations: %v", err)
+		slog.Error("migrations failed", "error", err)
+		os.Exit(1)
 	}
 
 	if env != "dev" {
@@ -75,8 +82,9 @@ func main() {
 	}
 
 	r := gin.New()
-	r.Use(gin.Recovery())
+	r.Use(middleware.Recover())
 	r.Use(otelgin.Middleware("vergo"))
+	r.Use(middleware.Logging())
 
 	// Health endpoints
 	startedAt := time.Now()
@@ -92,19 +100,17 @@ func main() {
 		c.Status(http.StatusOK)
 	})
 
-	// Grupo da API v1
+	// API v1
 	api := r.Group("/v1")
 	{
-		// rota simples de ping
 		api.GET("/_ping", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"pong": true})
 		})
 
-		// registra todos os endpoints stubs
 		router.Register(api)
 	}
 
-	// servidor HTTP com shutdown gracioso
+	// HTTP server with graceful shutdown
 	srv := &http.Server{
 		Addr:         ":" + strconv.Itoa(port),
 		Handler:      r,
@@ -114,37 +120,23 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("vergo listening on :%d (env=%s, version=%s)", port, env, version)
+		slog.Info("server started", "port", port, "env", env, "version", version)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server error: %v", err)
+			slog.Error("server error", "error", err)
+			os.Exit(1)
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("shutting down...")
+	slog.Info("shutting down")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("forced to shutdown: %v", err)
+		slog.Error("forced shutdown", "error", err)
+		os.Exit(1)
 	}
-	log.Println("bye!")
-}
-
-func getEnv(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
-}
-
-func getEnvInt(key string, def int) int {
-	if v := os.Getenv(key); v != "" {
-		if i, err := strconv.Atoi(v); err == nil {
-			return i
-		}
-	}
-	return def
+	slog.Info("server stopped")
 }

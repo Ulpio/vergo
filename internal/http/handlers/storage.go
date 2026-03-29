@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -188,9 +189,9 @@ func (h *StorageHandler) DeleteFile(c *gin.Context) {
 		return
 	}
 
-	// Deleta no S3 (best-effort; se quiser ser estrito, trate o erro)
+	// Deleta no S3 (best-effort)
 	if err := h.s3.DeleteObject(c.Request.Context(), f.Bucket, f.ObjectKey); err != nil {
-		// log.Printf("s3 delete failed: %v", err)
+		slog.ErrorContext(c.Request.Context(), "s3 delete failed", "error", err)
 	}
 
 	// Remove metadados

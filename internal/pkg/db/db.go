@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -49,9 +49,9 @@ func RunMigrations(db *sql.DB) error {
 	}
 
 	if err == migrate.ErrNoChange {
-		log.Println("✅ migrations já estão atualizadas")
+		slog.Info("migrations up to date")
 	} else {
-		log.Println("✅ migrations aplicadas com sucesso")
+		slog.Info("migrations applied successfully")
 	}
 	return nil
 }
