@@ -33,6 +33,19 @@ type presignPutIn struct {
 	ExpiresSec  int64  `json:"expires,omitempty"`
 }
 
+// PresignPut generates a presigned URL for S3 upload.
+// @Summary Get presigned upload URL
+// @Tags Storage
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param body body presignPutIn true "Upload parameters"
+// @Success 200 {object} PresignPutResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Failure 500 {object} ErrorDetailResponse
+// @Router /storage/presign [post]
 func (h *StorageHandler) PresignPut(c *gin.Context) {
 	var in presignPutIn
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -55,6 +68,19 @@ type presignGetIn struct {
 	ExpiresSec int64  `json:"expires,omitempty"`
 }
 
+// PresignGet generates a presigned URL for S3 download.
+// @Summary Get presigned download URL
+// @Tags Storage
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param body body presignGetIn true "Download parameters"
+// @Success 200 {object} PresignGetResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Failure 500 {object} ErrorDetailResponse
+// @Router /storage/presign-download [post]
 func (h *StorageHandler) PresignGet(c *gin.Context) {
 	var in presignGetIn
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -77,6 +103,20 @@ type fileCreateIn struct {
 	Metadata    interface{} `json:"metadata,omitempty"`
 }
 
+// CreateFile registers file metadata after upload.
+// @Summary Register uploaded file
+// @Tags Storage
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param body body fileCreateIn true "File metadata"
+// @Success 201 {object} file.File
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /storage/files [post]
 func (h *StorageHandler) CreateFile(c *gin.Context) {
 	orgID, ok := middleware.OrgID(c)
 	if !ok {
@@ -130,6 +170,19 @@ func (h *StorageHandler) CreateFile(c *gin.Context) {
 	c.JSON(http.StatusCreated, f)
 }
 
+// ListFiles returns files in the organization.
+// @Summary List files
+// @Tags Storage
+// @Security BearerAuth
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param limit query int false "Items per page (max 100)" default(20)
+// @Param offset query int false "Offset for pagination" default(0)
+// @Success 200 {object} map[string]interface{} "items, next_offset"
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /storage/files [get]
 func (h *StorageHandler) ListFiles(c *gin.Context) {
 	orgID, ok := middleware.OrgID(c)
 	if !ok {
@@ -158,6 +211,17 @@ func (h *StorageHandler) ListFiles(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items, "next_offset": offset + len(items)})
 }
 
+// GetFile returns file metadata by ID.
+// @Summary Get file
+// @Tags Storage
+// @Security BearerAuth
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param id path string true "File ID"
+// @Success 200 {object} file.File
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /storage/files/{id} [get]
 func (h *StorageHandler) GetFile(c *gin.Context) {
 	orgID, ok := middleware.OrgID(c)
 	if !ok {
@@ -174,6 +238,18 @@ func (h *StorageHandler) GetFile(c *gin.Context) {
 	c.JSON(http.StatusOK, f)
 }
 
+// DeleteFile removes a file from S3 and database.
+// @Summary Delete file
+// @Tags Storage
+// @Security BearerAuth
+// @Produce json
+// @Param X-Org-ID header string true "Organization ID"
+// @Param id path string true "File ID"
+// @Success 204 "No Content"
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /storage/files/{id} [delete]
 func (h *StorageHandler) DeleteFile(c *gin.Context) {
 	orgID, ok := middleware.OrgID(c)
 	if !ok {
