@@ -1,6 +1,9 @@
 package audit
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Event struct {
 	OrgID     string    `json:"org_id"`
@@ -9,6 +12,13 @@ type Event struct {
 	Entity    string    `json:"entity"`
 	EntityID  string    `json:"entity_id"`
 	Timestamp time.Time `json:"timestamp"`
+	Metadata  Metadata  `json:"metadata,omitempty"`
+}
+
+// Metadata holds optional before/after state for mutations.
+type Metadata struct {
+	Before json.RawMessage `json:"before,omitempty"`
+	After  json.RawMessage `json:"after,omitempty"`
 }
 
 type ListParams struct {

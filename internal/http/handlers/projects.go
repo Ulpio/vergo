@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -59,13 +60,11 @@ func (h *ProjectsHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "create_fail", "detail": err.Error()})
 		return
 	}
+	after, _ := json.Marshal(p)
 	_ = h.as.Record(audit.Event{
-		OrgID:     orgID,
-		ActorID:   userID,
-		Action:    "project.created",
-		Entity:    "project",
-		EntityID:  p.ID,
-		Timestamp: time.Now(),
+		OrgID: orgID, ActorID: userID, Action: "project.created",
+		Entity: "project", EntityID: p.ID, Timestamp: time.Now(),
+		Metadata: audit.Metadata{After: after},
 	})
 	c.JSON(http.StatusCreated, p)
 }
@@ -91,7 +90,13 @@ func (h *ProjectsHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing_org_id"})
 		return
 	}
+	userID, _ := middleware.UserID(c)
 	id := c.Param("id")
+
+	// Capture before state
+	old, _ := h.ps.Get(orgID, id)
+	before, _ := json.Marshal(old)
+
 	var in ProjectIn
 	if err := c.ShouldBindJSON(&in); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid_payload"})
@@ -102,6 +107,14 @@ func (h *ProjectsHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "not_found", "detail": err.Error()})
 		return
 	}
+
+	after, _ := json.Marshal(p)
+	_ = h.as.Record(audit.Event{
+		OrgID: orgID, ActorID: userID, Action: "project.updated",
+		Entity: "project", EntityID: id, Timestamp: time.Now(),
+		Metadata: audit.Metadata{Before: before, After: after},
+	})
+
 	c.JSON(http.StatusOK, p)
 }
 
@@ -111,19 +124,22 @@ func (h *ProjectsHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing_org_id"})
 		return
 	}
-	userID, _ := middleware.UserID(c) // só pra auditoria
+	userID, _ := middleware.UserID(c)
 	id := c.Param("id")
+
+	// Capture before state
+	old, _ := h.ps.Get(orgID, id)
+	before, _ := json.Marshal(old)
+
 	if err := h.ps.Delete(orgID, id); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
 		return
 	}
+
 	_ = h.as.Record(audit.Event{
-		OrgID:     orgID,
-		ActorID:   userID,
-		Action:    "project.deleted",
-		Entity:    "project",
-		EntityID:  id,
-		Timestamp: time.Now(),
+		OrgID: orgID, ActorID: userID, Action: "project.deleted",
+		Entity: "project", EntityID: id, Timestamp: time.Now(),
+		Metadata: audit.Metadata{Before: before},
 	})
 	c.Status(http.StatusNoContent)
 }
