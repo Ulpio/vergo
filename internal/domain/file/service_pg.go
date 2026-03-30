@@ -3,10 +3,14 @@ package file
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sqlc-dev/pqtype"
+
+	"github.com/Ulpio/vergo/internal/repo"
 )
 
 var ErrNotFound = errors.New("file not found")
@@ -24,9 +28,37 @@ type Service interface {
 	Delete(orgID, id string) error
 }
 
-type pgService struct{ db *sql.DB }
+type pgService struct {
+	db *sql.DB
+	q  *repo.Queries
+}
 
-func NewPostgresService(db *sql.DB) Service { return &pgService{db: db} }
+func NewPostgresService(db *sql.DB, q *repo.Queries) Service {
+	return &pgService{db: db, q: q}
+}
+
+func repoToFile(r repo.File) File {
+	f := File{
+		ID:          r.ID,
+		OrgID:       r.OrgID,
+		UploadedBy:  r.UploadedBy,
+		Bucket:      r.Bucket,
+		ObjectKey:   r.ObjectKey,
+		ContentType: r.ContentType.String,
+		CreatedAt:   r.CreatedAt,
+	}
+	if r.SizeBytes.Valid {
+		v := r.SizeBytes.Int64
+		f.SizeBytes = &v
+	}
+	if r.Metadata.Valid && len(r.Metadata.RawMessage) > 0 {
+		var m map[string]any
+		if json.Unmarshal(r.Metadata.RawMessage, &m) == nil {
+			f.Metadata = m
+		}
+	}
+	return f
+}
 
 func (s *pgService) List(p ListParams) ([]File, error) {
 	if p.Limit <= 0 || p.Limit > 100 {
@@ -36,58 +68,76 @@ func (s *pgService) List(p ListParams) ([]File, error) {
 		p.Offset = 0
 	}
 
-	const q = `
-SELECT id, org_id, uploaded_by, bucket, object_key, size_bytes, content_type, created_at, metadata
-FROM files
-WHERE org_id = $1
-ORDER BY created_at DESC
-LIMIT $2 OFFSET $3`
-	rows, err := s.db.QueryContext(context.Background(), q, p.OrgID, p.Limit, p.Offset)
+	rows, err := s.q.ListFiles(context.Background(), repo.ListFilesParams{
+		OrgID:  p.OrgID,
+		Limit:  int32(p.Limit),
+		Offset: int32(p.Offset),
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var out []File
-	for rows.Next() {
-		var f File
-		if err := rows.Scan(&f.ID, &f.OrgID, &f.UploadedBy, &f.Bucket, &f.ObjectKey, &f.SizeBytes, &f.ContentType, &f.CreatedAt, &f.Metadata); err != nil {
-			return nil, err
-		}
-		out = append(out, f)
+	out := make([]File, len(rows))
+	for i, r := range rows {
+		out[i] = repoToFile(r)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s *pgService) Create(orgID, userID, bucket, key string, size *int64, contentType string, metadata any) (File, error) {
 	id := uuid.NewString()
-	const q = `
-INSERT INTO files (id, org_id, uploaded_by, bucket, object_key, size_bytes, content_type, created_at, metadata)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-RETURNING id, org_id, uploaded_by, bucket, object_key, size_bytes, content_type, created_at, metadata`
-	var f File
-	err := s.db.QueryRowContext(context.Background(), q,
-		id, orgID, userID, bucket, key, size, contentType, time.Now(), metadata,
-	).Scan(&f.ID, &f.OrgID, &f.UploadedBy, &f.Bucket, &f.ObjectKey, &f.SizeBytes, &f.ContentType, &f.CreatedAt, &f.Metadata)
-	return f, err
+
+	sizeBytes := sql.NullInt64{}
+	if size != nil {
+		sizeBytes = sql.NullInt64{Int64: *size, Valid: true}
+	}
+
+	ct := sql.NullString{String: contentType, Valid: contentType != ""}
+
+	metaNRM := pqtype.NullRawMessage{}
+	if metadata != nil {
+		b, err := json.Marshal(metadata)
+		if err == nil {
+			metaNRM = pqtype.NullRawMessage{RawMessage: b, Valid: true}
+		}
+	}
+
+	r, err := s.q.InsertFile(context.Background(), repo.InsertFileParams{
+		ID:          id,
+		OrgID:       orgID,
+		UploadedBy:  userID,
+		Bucket:      bucket,
+		ObjectKey:   key,
+		SizeBytes:   sizeBytes,
+		ContentType: ct,
+		CreatedAt:   time.Now(),
+		Metadata:    metaNRM,
+	})
+	if err != nil {
+		return File{}, err
+	}
+	return repoToFile(r), nil
 }
 
 func (s *pgService) Get(orgID, id string) (File, error) {
-	const q = `
-SELECT id, org_id, uploaded_by, bucket, object_key, size_bytes, content_type, created_at, metadata
-FROM files
-WHERE id = $1 AND org_id = $2`
-	var f File
-	err := s.db.QueryRowContext(context.Background(), q, id, orgID).
-		Scan(&f.ID, &f.OrgID, &f.UploadedBy, &f.Bucket, &f.ObjectKey, &f.SizeBytes, &f.ContentType, &f.CreatedAt, &f.Metadata)
+	r, err := s.q.GetFile(context.Background(), repo.GetFileParams{
+		ID:    id,
+		OrgID: orgID,
+	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return File{}, ErrNotFound
 	}
-	return f, err
+	if err != nil {
+		return File{}, err
+	}
+	return repoToFile(r), nil
 }
 
 func (s *pgService) Delete(orgID, id string) error {
-	res, err := s.db.ExecContext(context.Background(), `DELETE FROM files WHERE id=$1 AND org_id=$2`, id, orgID)
+	res, err := s.q.DeleteFile(context.Background(), repo.DeleteFileParams{
+		ID:    id,
+		OrgID: orgID,
+	})
 	if err != nil {
 		return err
 	}
