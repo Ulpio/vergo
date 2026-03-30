@@ -5,40 +5,39 @@ import (
 	"database/sql"
 	"encoding/json"
 	"time"
+
+	"github.com/sqlc-dev/pqtype"
+
+	"github.com/Ulpio/vergo/internal/repo"
 )
 
-type pgService struct{ db *sql.DB }
+type pgService struct {
+	db *sql.DB
+	q  *repo.Queries
+}
 
-func NewPostgresService(db *sql.DB) Service { return &pgService{db: db} }
+func NewPostgresService(db *sql.DB, q *repo.Queries) Service {
+	return &pgService{db: db, q: q}
+}
 
 func (s *pgService) Record(e Event) error {
-	const q = `
-INSERT INTO audit_logs (org_id, actor_id, action, entity, entity_id, metadata, created_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7)`
-
-	meta, err := json.Marshal(e.Metadata)
+	metaJSON, err := json.Marshal(e.Metadata)
 	if err != nil {
-		meta = []byte("{}")
+		metaJSON = []byte("{}")
 	}
 
-	_, err = s.db.ExecContext(context.Background(), q,
-		e.OrgID, e.ActorID, e.Action, e.Entity, e.EntityID, meta, time.Now())
-	return err
+	return s.q.InsertAuditLog(context.Background(), repo.InsertAuditLogParams{
+		OrgID:     e.OrgID,
+		ActorID:   e.ActorID,
+		Action:    e.Action,
+		Entity:    e.Entity,
+		EntityID:  e.EntityID,
+		Metadata:  pqtype.NullRawMessage{RawMessage: metaJSON, Valid: true},
+		CreatedAt: time.Now(),
+	})
 }
 
 func (s *pgService) List(p ListParams) ([]Event, error) {
-	const q = `
-SELECT org_id, actor_id, action, entity, entity_id, COALESCE(metadata, '{}'), created_at
-FROM audit_logs
-WHERE org_id = $1
-  AND ($2::text IS NULL OR actor_id = $2)
-  AND ($3::text IS NULL OR action  = $3)
-  AND ($4::text IS NULL OR entity  = $4)
-  AND ($5::timestamptz IS NULL OR created_at >= $5)
-  AND ($6::timestamptz IS NULL OR created_at <= $6)
-ORDER BY created_at DESC
-LIMIT $7 OFFSET $8`
-
 	limit := p.Limit
 	if limit <= 0 || limit > 100 {
 		limit = 20
@@ -48,24 +47,49 @@ LIMIT $7 OFFSET $8`
 		offset = 0
 	}
 
-	rows, err := s.db.QueryContext(context.Background(), q,
-		p.OrgID, p.ActorID, p.Action, p.Entity, p.Since, p.Until, limit, offset)
+	rows, err := s.q.ListAuditLogs(context.Background(), repo.ListAuditLogsParams{
+		OrgID:   p.OrgID,
+		Column2: derefStr(p.ActorID),
+		Column3: derefStr(p.Action),
+		Column4: derefStr(p.Entity),
+		Column5: derefTime(p.Since),
+		Column6: derefTime(p.Until),
+		Limit:   int32(limit),
+		Offset:  int32(offset),
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var out []Event
-	for rows.Next() {
-		var e Event
-		var metaBytes []byte
-		if err := rows.Scan(&e.OrgID, &e.ActorID, &e.Action, &e.Entity, &e.EntityID, &metaBytes, &e.Timestamp); err != nil {
-			return nil, err
+	out := make([]Event, 0, len(rows))
+	for _, r := range rows {
+		var meta Metadata
+		if len(r.Metadata) > 0 {
+			_ = json.Unmarshal(r.Metadata, &meta)
 		}
-		if len(metaBytes) > 0 {
-			_ = json.Unmarshal(metaBytes, &e.Metadata)
-		}
-		out = append(out, e)
+		out = append(out, Event{
+			OrgID:     r.OrgID,
+			ActorID:   r.ActorID,
+			Action:    r.Action,
+			Entity:    r.Entity,
+			EntityID:  r.EntityID,
+			Timestamp: r.CreatedAt,
+			Metadata:  meta,
+		})
 	}
-	return out, rows.Err()
+	return out, nil
+}
+
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func derefTime(t *time.Time) time.Time {
+	if t == nil {
+		return time.Time{}
+	}
+	return *t
 }
