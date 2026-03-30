@@ -7,11 +7,12 @@ import (
 
 	"github.com/Ulpio/vergo/internal/domain/user"
 	"github.com/Ulpio/vergo/internal/pkg/testutil"
+	"github.com/Ulpio/vergo/internal/repo"
 )
 
 func TestPGService_Signup(t *testing.T) {
 	db := testutil.PGContainer(t)
-	svc := user.NewPostgresService(db)
+	svc := user.NewPostgresService(db, repo.New(db))
 
 	u, err := svc.Signup("alice@example.com", "password123")
 	if err != nil {
@@ -27,7 +28,7 @@ func TestPGService_Signup(t *testing.T) {
 
 func TestPGService_SignupDuplicate(t *testing.T) {
 	db := testutil.PGContainer(t)
-	svc := user.NewPostgresService(db)
+	svc := user.NewPostgresService(db, repo.New(db))
 
 	_, err := svc.Signup("dup@example.com", "pass123")
 	if err != nil {
@@ -41,7 +42,7 @@ func TestPGService_SignupDuplicate(t *testing.T) {
 
 func TestPGService_Login(t *testing.T) {
 	db := testutil.PGContainer(t)
-	svc := user.NewPostgresService(db)
+	svc := user.NewPostgresService(db, repo.New(db))
 
 	_, err := svc.Signup("bob@example.com", "secretpass")
 	if err != nil {
@@ -59,7 +60,7 @@ func TestPGService_Login(t *testing.T) {
 
 func TestPGService_LoginWrongPassword(t *testing.T) {
 	db := testutil.PGContainer(t)
-	svc := user.NewPostgresService(db)
+	svc := user.NewPostgresService(db, repo.New(db))
 
 	_, _ = svc.Signup("charlie@example.com", "correct")
 	_, err := svc.Login("charlie@example.com", "wrong")
@@ -70,7 +71,7 @@ func TestPGService_LoginWrongPassword(t *testing.T) {
 
 func TestPGService_GetByID(t *testing.T) {
 	db := testutil.PGContainer(t)
-	svc := user.NewPostgresService(db)
+	svc := user.NewPostgresService(db, repo.New(db))
 
 	created, _ := svc.Signup("dave@example.com", "pass")
 	found, err := svc.GetByID(created.ID)
@@ -84,7 +85,7 @@ func TestPGService_GetByID(t *testing.T) {
 
 func TestPGService_GetByID_NotFound(t *testing.T) {
 	db := testutil.PGContainer(t)
-	svc := user.NewPostgresService(db)
+	svc := user.NewPostgresService(db, repo.New(db))
 
 	_, err := svc.GetByID("nonexistent-id")
 	if err == nil {
