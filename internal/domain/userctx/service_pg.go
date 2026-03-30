@@ -3,6 +3,8 @@ package userctx
 import (
 	"context"
 	"database/sql"
+
+	"github.com/Ulpio/vergo/internal/repo"
 )
 
 type Service interface {
@@ -10,14 +12,17 @@ type Service interface {
 	SetActiveOrg(userID, orgID string) error
 }
 
-type pgService struct{ db *sql.DB }
+type pgService struct {
+	db *sql.DB
+	q  *repo.Queries
+}
 
-func NewPostgresService(db *sql.DB) Service { return &pgService{db: db} }
+func NewPostgresService(db *sql.DB, q *repo.Queries) Service {
+	return &pgService{db: db, q: q}
+}
 
 func (s *pgService) GetActiveOrg(userID string) (string, bool, error) {
-	const q = `SELECT org_id FROM user_contexts WHERE user_id = $1`
-	var orgID string
-	err := s.db.QueryRowContext(context.Background(), q, userID).Scan(&orgID)
+	orgID, err := s.q.GetActiveOrg(context.Background(), userID)
 	if err == sql.ErrNoRows {
 		return "", false, nil
 	}
@@ -25,12 +30,8 @@ func (s *pgService) GetActiveOrg(userID string) (string, bool, error) {
 }
 
 func (s *pgService) SetActiveOrg(userID, orgID string) error {
-	const q = `
-INSERT INTO user_contexts (user_id, org_id, updated_at)
-VALUES ($1, $2, NOW())
-ON CONFLICT (user_id) DO UPDATE
-SET org_id = $2,
-    updated_at = NOW()`
-	_, err := s.db.ExecContext(context.Background(), q, userID, orgID)
-	return err
+	return s.q.UpsertActiveOrg(context.Background(), repo.UpsertActiveOrgParams{
+		UserID: userID,
+		OrgID:  orgID,
+	})
 }
