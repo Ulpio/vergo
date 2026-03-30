@@ -1,4 +1,4 @@
-.PHONY: help run dev build test test-integration test-fuzz lint fmt vet generate swagger swagger-check clean \
+.PHONY: help run dev build test test-integration test-fuzz lint fmt vet generate swagger swagger-check sqlc sqlc-check clean \
        docker-up docker-down docker-reset \
        migrate-sync migrate-up migrate-down migrate-create deps
 
@@ -49,7 +49,7 @@ fmt: ## Format code
 vet: ## Run go vet
 	go vet ./...
 
-generate: ## Run go generate
+generate: sqlc ## Run all code generation
 	go generate ./...
 
 swagger: ## Regenerate Swagger docs
@@ -58,6 +58,13 @@ swagger: ## Regenerate Swagger docs
 
 swagger-check: swagger ## Verify Swagger docs are up-to-date (CI)
 	@git diff --exit-code docs/swagger/ || (echo "Swagger docs are out of date. Run 'make swagger' and commit." && exit 1)
+
+sqlc: ## Regenerate sqlc code
+	@command -v sqlc >/dev/null 2>&1 || { echo "Installing sqlc..."; go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest; }
+	sqlc generate
+
+sqlc-check: sqlc ## Verify sqlc code is up-to-date (CI)
+	@git diff --exit-code internal/repo/ || (echo "sqlc code is out of date. Run 'make sqlc' and commit." && exit 1)
 
 check: vet lint test ## Run vet + lint + test (CI equivalent)
 
