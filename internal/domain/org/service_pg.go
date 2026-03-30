@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/Ulpio/vergo/internal/repo"
 )
 
 var (
@@ -25,29 +27,43 @@ type Service interface {
 	Delete(orgID string) error
 }
 
-type pgService struct{ db *sql.DB }
+type pgService struct {
+	db *sql.DB
+	q  *repo.Queries
+}
 
-func NewPostgresService(db *sql.DB) Service { return &pgService{db: db} }
+func NewPostgresService(db *sql.DB, q *repo.Queries) Service {
+	return &pgService{db: db, q: q}
+}
 
 func (s *pgService) Create(name, ownerUserID string) (Organization, error) {
 	id := uuid.NewString()
 	now := time.Now()
-	tx, err := s.db.BeginTx(context.Background(), nil)
+	ctx := context.Background()
+
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Organization{}, err
 	}
 	defer tx.Rollback()
 
-	_, err = tx.ExecContext(context.Background(),
-		`INSERT INTO organizations (id,name,owner_user_id,created_at) VALUES ($1,$2,$3,$4)`,
-		id, name, ownerUserID, now)
+	qtx := s.q.WithTx(tx)
+
+	err = qtx.InsertOrg(ctx, repo.InsertOrgParams{
+		ID:          id,
+		Name:        name,
+		OwnerUserID: ownerUserID,
+		CreatedAt:   now,
+	})
 	if err != nil {
 		return Organization{}, err
 	}
 
-	_, err = tx.ExecContext(context.Background(),
-		`INSERT INTO memberships (org_id,user_id,role) VALUES ($1,$2,'owner')`,
-		id, ownerUserID)
+	err = qtx.UpsertMember(ctx, repo.UpsertMemberParams{
+		OrgID:  id,
+		UserID: ownerUserID,
+		Role:   "owner",
+	})
 	if err != nil {
 		return Organization{}, err
 	}
@@ -60,27 +76,35 @@ func (s *pgService) Create(name, ownerUserID string) (Organization, error) {
 }
 
 func (s *pgService) Get(id string) (Organization, error) {
-	var o Organization
-	err := s.db.QueryRowContext(context.Background(),
-		`SELECT id,name,owner_user_id,created_at FROM organizations WHERE id = $1`, id).
-		Scan(&o.ID, &o.Name, &o.OwnerUser, &o.CreatedAt)
+	r, err := s.q.GetOrg(context.Background(), id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Organization{}, ErrNotFound
 	}
-	return o, err
+	if err != nil {
+		return Organization{}, err
+	}
+	return Organization{
+		ID:        r.ID,
+		Name:      r.Name,
+		OwnerUser: r.OwnerUserID,
+		CreatedAt: r.CreatedAt,
+	}, nil
 }
 
 func (s *pgService) AddMember(orgID, userID, role string) error {
-	_, err := s.db.ExecContext(context.Background(),
-		`INSERT INTO memberships (org_id,user_id,role) VALUES ($1,$2,$3)
-		 ON CONFLICT (org_id,user_id) DO UPDATE SET role = EXCLUDED.role`,
-		orgID, userID, role)
-	return err
+	return s.q.UpsertMember(context.Background(), repo.UpsertMemberParams{
+		OrgID:  orgID,
+		UserID: userID,
+		Role:   role,
+	})
 }
 
 func (s *pgService) UpdateMember(orgID, userID, role string) error {
-	res, err := s.db.ExecContext(context.Background(),
-		`UPDATE memberships SET role=$3 WHERE org_id=$1 AND user_id=$2`, orgID, userID, role)
+	res, err := s.q.UpdateMemberRole(context.Background(), repo.UpdateMemberRoleParams{
+		OrgID:  orgID,
+		UserID: userID,
+		Role:   role,
+	})
 	if err != nil {
 		return err
 	}
@@ -92,16 +116,17 @@ func (s *pgService) UpdateMember(orgID, userID, role string) error {
 }
 
 func (s *pgService) RemoveMember(orgID, userID string) error {
-	_, err := s.db.ExecContext(context.Background(),
-		`DELETE FROM memberships WHERE org_id=$1 AND user_id=$2`, orgID, userID)
-	return err
+	return s.q.DeleteMember(context.Background(), repo.DeleteMemberParams{
+		OrgID:  orgID,
+		UserID: userID,
+	})
 }
 
 func (s *pgService) IsMember(orgID, userID string) (bool, string, error) {
-	var role string
-	err := s.db.QueryRowContext(context.Background(),
-		`SELECT role FROM memberships WHERE org_id=$1 AND user_id=$2`, orgID, userID).
-		Scan(&role)
+	role, err := s.q.GetMemberRole(context.Background(), repo.GetMemberRoleParams{
+		OrgID:  orgID,
+		UserID: userID,
+	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, "", nil
 	}
@@ -109,7 +134,5 @@ func (s *pgService) IsMember(orgID, userID string) (bool, string, error) {
 }
 
 func (s *pgService) Delete(id string) error {
-	_, err := s.db.ExecContext(context.Background(),
-		`DELETE FROM organizations WHERE id=$1`, id)
-	return err
+	return s.q.DeleteOrg(context.Background(), id)
 }

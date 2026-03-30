@@ -19,7 +19,7 @@ func setupOrg(t *testing.T) (org.Service, user.User) {
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	return org.NewPostgresService(db), u
+	return org.NewPostgresService(db, repo.New(db)), u
 }
 
 func TestPGService_CreateOrg(t *testing.T) {
@@ -61,7 +61,7 @@ func TestPGService_GetOrg_NotFound(t *testing.T) {
 func TestPGService_Membership(t *testing.T) {
 	db := testutil.PGContainer(t)
 	userSvc := user.NewPostgresService(db, repo.New(db))
-	orgSvc := org.NewPostgresService(db)
+	orgSvc := org.NewPostgresService(db, repo.New(db))
 
 	owner, _ := userSvc.Signup("owner@test.com", "pass")
 	member, _ := userSvc.Signup("member@test.com", "pass")
