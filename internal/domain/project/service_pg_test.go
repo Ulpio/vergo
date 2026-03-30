@@ -16,12 +16,12 @@ func setup(t *testing.T) (project.Service, string, string) {
 	t.Helper()
 	db := testutil.PGContainer(t)
 	userSvc := user.NewPostgresService(db, repo.New(db))
-	orgSvc := org.NewPostgresService(db)
+	orgSvc := org.NewPostgresService(db, repo.New(db))
 
 	u, _ := userSvc.Signup("projuser@test.com", "pass")
 	o, _ := orgSvc.Create("ProjOrg", u.ID)
 
-	return project.NewPostgresService(db), o.ID, u.ID
+	return project.NewPostgresService(db, repo.New(db)), o.ID, u.ID
 }
 
 func TestPGService_CreateProject(t *testing.T) {
