@@ -9,12 +9,13 @@ import (
 	"github.com/Ulpio/vergo/internal/domain/project"
 	"github.com/Ulpio/vergo/internal/domain/user"
 	"github.com/Ulpio/vergo/internal/pkg/testutil"
+	"github.com/Ulpio/vergo/internal/repo"
 )
 
 func setup(t *testing.T) (project.Service, string, string) {
 	t.Helper()
 	db := testutil.PGContainer(t)
-	userSvc := user.NewPostgresService(db)
+	userSvc := user.NewPostgresService(db, repo.New(db))
 	orgSvc := org.NewPostgresService(db)
 
 	u, _ := userSvc.Signup("projuser@test.com", "pass")

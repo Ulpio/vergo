@@ -8,12 +8,13 @@ import (
 	"github.com/Ulpio/vergo/internal/domain/org"
 	"github.com/Ulpio/vergo/internal/domain/user"
 	"github.com/Ulpio/vergo/internal/pkg/testutil"
+	"github.com/Ulpio/vergo/internal/repo"
 )
 
 func setupOrg(t *testing.T) (org.Service, user.User) {
 	t.Helper()
 	db := testutil.PGContainer(t)
-	userSvc := user.NewPostgresService(db)
+	userSvc := user.NewPostgresService(db, repo.New(db))
 	u, err := userSvc.Signup("orgowner@test.com", "pass123")
 	if err != nil {
 		t.Fatalf("create user: %v", err)
@@ -59,7 +60,7 @@ func TestPGService_GetOrg_NotFound(t *testing.T) {
 
 func TestPGService_Membership(t *testing.T) {
 	db := testutil.PGContainer(t)
-	userSvc := user.NewPostgresService(db)
+	userSvc := user.NewPostgresService(db, repo.New(db))
 	orgSvc := org.NewPostgresService(db)
 
 	owner, _ := userSvc.Signup("owner@test.com", "pass")
