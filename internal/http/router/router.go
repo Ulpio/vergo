@@ -35,12 +35,12 @@ func Register(v1 *gin.RouterGroup) {
 
 	// Services
 	userSvc := user.NewPostgresService(sqlDB, queries)
-	orgSvc := org.NewPostgresService(sqlDB)
-	projSvc := project.NewPostgresService(sqlDB)
-	auditSvc := audit.NewPostgresService(sqlDB)
+	orgSvc := org.NewPostgresService(sqlDB, queries)
+	projSvc := project.NewPostgresService(sqlDB, queries)
+	auditSvc := audit.NewPostgresService(sqlDB, queries)
 	rfStore := auth.NewRefreshStore(sqlDB, queries)
-	ctxSvc := userctx.NewPostgresService(sqlDB)
-	fileSvc := file.NewPostgresService(sqlDB)
+	ctxSvc := userctx.NewPostgresService(sqlDB, queries)
+	fileSvc := file.NewPostgresService(sqlDB, queries)
 
 	// Handler
 	authH := handlers.NewAuthHandler(cfg, userSvc, rfStore)
