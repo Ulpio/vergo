@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/Ulpio/vergo/internal/auth"
+	"github.com/Ulpio/vergo/internal/domain/apikey"
 	"github.com/Ulpio/vergo/internal/domain/audit"
 	"github.com/Ulpio/vergo/internal/domain/file"
 	"github.com/Ulpio/vergo/internal/domain/org"
@@ -41,6 +42,7 @@ func Register(v1 *gin.RouterGroup) {
 	rfStore := auth.NewRefreshStore(sqlDB, queries)
 	ctxSvc := userctx.NewPostgresService(sqlDB, queries)
 	fileSvc := file.NewPostgresService(sqlDB, queries)
+	keySvc := apikey.NewService(queries)
 
 	// Handler
 	authH := handlers.NewAuthHandler(cfg, userSvc, rfStore)
@@ -49,6 +51,7 @@ func Register(v1 *gin.RouterGroup) {
 	meH := handlers.NewMeHandler(userSvc, orgSvc)
 	auditH := handlers.NewAuditHandler(auditSvc)
 	ctxH := handlers.NewContextHandler(ctxSvc, orgSvc)
+	keyH := handlers.NewAPIKeysHandler(keySvc, auditSvc)
 
 	s3c, err := s3store.NewFromConfig(cfg)
 	if err != nil {
@@ -86,7 +89,7 @@ func Register(v1 *gin.RouterGroup) {
 
 	// ── Autenticado + Tenant (exige X-Org-ID e membership) ────────────
 	protected := v1.Group("/")
-	protected.Use(middleware.Auth(cfg), middleware.Tenant(orgSvc, ctxSvc))
+	protected.Use(middleware.AuthWithAPIKeys(cfg, keySvc), middleware.Tenant(orgSvc, ctxSvc))
 	{
 		// Orgs (rotas sensíveis com RBAC)
 		orgs := protected.Group("/orgs")
@@ -116,9 +119,9 @@ func Register(v1 *gin.RouterGroup) {
 		// API Keys
 		keys := protected.Group("/api-keys")
 		{
-			keys.POST("", notImplemented("apikeys.create"))
-			keys.GET("", notImplemented("apikeys.list"))
-			keys.DELETE("/:id", notImplemented("apikeys.delete"))
+			keys.POST("", keyH.Create)
+			keys.GET("", keyH.List)
+			keys.DELETE("/:id", keyH.Revoke)
 		}
 
 		// Webhooks

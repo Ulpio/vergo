@@ -5,13 +5,19 @@ import (
 	"strings"
 
 	"github.com/Ulpio/vergo/internal/auth"
+	"github.com/Ulpio/vergo/internal/domain/apikey"
 	"github.com/Ulpio/vergo/internal/pkg/config"
 	"github.com/gin-gonic/gin"
 )
 
 const ctxUserID = "user_id"
+const ctxAPIKeyAuth = "api_key_auth"
 
 func Auth(cfg config.Config) gin.HandlerFunc {
+	return AuthWithAPIKeys(cfg, nil)
+}
+
+func AuthWithAPIKeys(cfg config.Config, keySvc apikey.Service) gin.HandlerFunc {
 	const prefix = "bearer "
 	return func(c *gin.Context) {
 		h := c.GetHeader("Authorization")
@@ -24,6 +30,26 @@ func Auth(cfg config.Config) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing_bearer"})
 			return
 		}
+
+		// API Key authentication (sk_...)
+		if strings.HasPrefix(token, "sk_") && keySvc != nil {
+			result, err := keySvc.Validate(token)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "key_validation_failed"})
+				return
+			}
+			if result == nil {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid_api_key"})
+				return
+			}
+			c.Set(ctxUserID, result.KeyID)
+			c.Set(ctxOrgID, result.OrgID)
+			c.Set(ctxAPIKeyAuth, true)
+			c.Next()
+			return
+		}
+
+		// JWT authentication
 		claims, err := auth.Parse(token, cfg.JWTAccessSecret)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})

@@ -11,6 +11,19 @@ import (
 	"github.com/sqlc-dev/pqtype"
 )
 
+type ApiKey struct {
+	ID         string       `json:"id"`
+	OrgID      string       `json:"org_id"`
+	Name       string       `json:"name"`
+	KeyPrefix  string       `json:"key_prefix"`
+	KeyHash    string       `json:"key_hash"`
+	CreatedBy  string       `json:"created_by"`
+	CreatedAt  time.Time    `json:"created_at"`
+	ExpiresAt  sql.NullTime `json:"expires_at"`
+	LastUsedAt sql.NullTime `json:"last_used_at"`
+	RevokedAt  sql.NullTime `json:"revoked_at"`
+}
+
 type AuditLog struct {
 	ID        int64                 `json:"id"`
 	OrgID     string                `json:"org_id"`
