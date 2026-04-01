@@ -6,6 +6,7 @@ package repo
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/sqlc-dev/pqtype"
@@ -90,5 +91,29 @@ type User struct {
 type UserContext struct {
 	UserID    string    `json:"user_id"`
 	OrgID     string    `json:"org_id"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type WebhookDelivery struct {
+	ID         string          `json:"id"`
+	EndpointID string          `json:"endpoint_id"`
+	Event      string          `json:"event"`
+	Payload    json.RawMessage `json:"payload"`
+	StatusCode sql.NullInt32   `json:"status_code"`
+	Response   sql.NullString  `json:"response"`
+	Attempts   int32           `json:"attempts"`
+	NextRetry  sql.NullTime    `json:"next_retry"`
+	Delivered  bool            `json:"delivered"`
+	CreatedAt  time.Time       `json:"created_at"`
+}
+
+type WebhookEndpoint struct {
+	ID        string    `json:"id"`
+	OrgID     string    `json:"org_id"`
+	Url       string    `json:"url"`
+	Secret    string    `json:"secret"`
+	Events    []string  `json:"events"`
+	Active    bool      `json:"active"`
+	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/Ulpio/vergo/internal/auth"
 	"github.com/Ulpio/vergo/internal/domain/apikey"
 	"github.com/Ulpio/vergo/internal/domain/audit"
+	"github.com/Ulpio/vergo/internal/domain/webhook"
 	"github.com/Ulpio/vergo/internal/domain/file"
 	"github.com/Ulpio/vergo/internal/domain/org"
 	"github.com/Ulpio/vergo/internal/domain/project"
@@ -43,6 +44,7 @@ func Register(v1 *gin.RouterGroup) {
 	ctxSvc := userctx.NewPostgresService(sqlDB, queries)
 	fileSvc := file.NewPostgresService(sqlDB, queries)
 	keySvc := apikey.NewService(queries)
+	whSvc := webhook.NewService(queries)
 
 	// Handler
 	authH := handlers.NewAuthHandler(cfg, userSvc, rfStore)
@@ -52,6 +54,7 @@ func Register(v1 *gin.RouterGroup) {
 	auditH := handlers.NewAuditHandler(auditSvc)
 	ctxH := handlers.NewContextHandler(ctxSvc, orgSvc)
 	keyH := handlers.NewAPIKeysHandler(keySvc, auditSvc)
+	whH := handlers.NewWebhooksHandler(whSvc)
 
 	s3c, err := s3store.NewFromConfig(cfg)
 	if err != nil {
@@ -127,10 +130,10 @@ func Register(v1 *gin.RouterGroup) {
 		// Webhooks
 		wh := protected.Group("/webhooks")
 		{
-			wh.POST("/endpoints", notImplemented("webhooks.endpoints.create"))
-			wh.GET("/endpoints", notImplemented("webhooks.endpoints.list"))
-			wh.PATCH("/endpoints/:id", notImplemented("webhooks.endpoints.update"))
-			wh.POST("/test", notImplemented("webhooks.test"))
+			wh.POST("/endpoints", whH.CreateEndpoint)
+			wh.GET("/endpoints", whH.ListEndpoints)
+			wh.PATCH("/endpoints/:id", whH.UpdateEndpoint)
+			wh.POST("/test", whH.Test)
 		}
 
 		// Billing

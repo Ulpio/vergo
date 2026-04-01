@@ -20,8 +20,10 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
 	_ "github.com/Ulpio/vergo/docs/swagger"
+	"github.com/Ulpio/vergo/internal/domain/webhook"
 	"github.com/Ulpio/vergo/internal/http/middleware"
 	"github.com/Ulpio/vergo/internal/http/router"
+	"github.com/Ulpio/vergo/internal/repo"
 	"github.com/Ulpio/vergo/internal/pkg/config"
 	"github.com/Ulpio/vergo/internal/pkg/db"
 	"github.com/Ulpio/vergo/internal/pkg/logging"
@@ -157,6 +159,15 @@ func main() {
 		}()
 	}
 
+	// Webhook dispatcher (background goroutine)
+	whDispatcher := webhook.NewDispatcher(repo.New(database))
+	whTicker := time.NewTicker(30 * time.Second)
+	go func() {
+		for range whTicker.C {
+			whDispatcher.ProcessPending()
+		}
+	}()
+
 	// HTTP server
 	srv := &http.Server{
 		Addr:         ":" + strconv.Itoa(port),
@@ -180,7 +191,8 @@ func main() {
 	sig := <-quit
 	slog.Info("shutdown signal received", "signal", sig.String())
 
-	// Graceful shutdown: HTTP → telemetry → DB (ordered, not deferred)
+	// Graceful shutdown: ticker → HTTP → telemetry → DB (ordered, not deferred)
+	whTicker.Stop()
 	gracefulShutdown(srv, otelResult.Shutdown, database)
 }
 
