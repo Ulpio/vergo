@@ -1,5 +1,60 @@
 basePath: /v1
 definitions:
+  github_com_Ulpio_vergo_internal_domain_apikey.APIKey:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      key_prefix:
+        type: string
+      last_used_at:
+        type: string
+      name:
+        type: string
+      org_id:
+        type: string
+    type: object
+  github_com_Ulpio_vergo_internal_domain_apikey.CreateResult:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      key:
+        type: string
+      key_prefix:
+        type: string
+      last_used_at:
+        type: string
+      name:
+        type: string
+      org_id:
+        type: string
+    type: object
+  github_com_Ulpio_vergo_internal_domain_billing.Subscription:
+    properties:
+      current_period_end:
+        type: string
+      id:
+        type: string
+      org_id:
+        type: string
+      plan:
+        type: string
+      status:
+        type: string
+      stripe_subscription_id:
+        type: string
+    type: object
   github_com_Ulpio_vergo_internal_domain_file.File:
     properties:
       bucket:
@@ -47,6 +102,25 @@ definitions:
       org_id:
         type: string
       updated_by:
+        type: string
+    type: object
+  github_com_Ulpio_vergo_internal_domain_webhook.Endpoint:
+    properties:
+      active:
+        type: boolean
+      created_at:
+        type: string
+      events:
+        items:
+          type: string
+        type: array
+      id:
+        type: string
+      org_id:
+        type: string
+      updated_at:
+        type: string
+      url:
         type: string
     type: object
   internal_http_handlers.AuthResponse:
@@ -161,6 +235,40 @@ definitions:
         example: eyJhbGciOiJIUzI1NiIs...
         type: string
     type: object
+  internal_http_handlers.checkoutIn:
+    properties:
+      cancel_url:
+        type: string
+      price_id:
+        type: string
+      success_url:
+        type: string
+    required:
+    - cancel_url
+    - price_id
+    - success_url
+    type: object
+  internal_http_handlers.createEndpointIn:
+    properties:
+      events:
+        items:
+          type: string
+        type: array
+      url:
+        type: string
+    required:
+    - events
+    - url
+    type: object
+  internal_http_handlers.createKeyIn:
+    properties:
+      expires_at:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
   internal_http_handlers.createOrgIn:
     properties:
       name:
@@ -192,6 +300,13 @@ definitions:
         type: integer
     required:
     - key
+    type: object
+  internal_http_handlers.forgotIn:
+    properties:
+      email:
+        type: string
+    required:
+    - email
     type: object
   internal_http_handlers.memberIn:
     properties:
@@ -236,12 +351,37 @@ definitions:
     required:
     - refresh_token
     type: object
+  internal_http_handlers.resetIn:
+    properties:
+      new_password:
+        minLength: 6
+        type: string
+      token:
+        type: string
+    required:
+    - new_password
+    - token
+    type: object
   internal_http_handlers.setContectIn:
     properties:
       org_id:
         type: string
     required:
     - org_id
+    type: object
+  internal_http_handlers.updateEndpointIn:
+    properties:
+      active:
+        type: boolean
+      events:
+        items:
+          type: string
+        type: array
+      url:
+        type: string
+    required:
+    - events
+    - url
     type: object
 host: localhost:8080
 info:
@@ -250,6 +390,104 @@ info:
   title: Vergo API
   version: 0.1.0
 paths:
+  /api-keys:
+    get:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_Ulpio_vergo_internal_domain_apikey.APIKey'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List API keys
+      tags:
+      - API Keys
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Key name and optional expiration
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.createKeyIn'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_Ulpio_vergo_internal_domain_apikey.CreateResult'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create API key
+      tags:
+      - API Keys
+  /api-keys/{id}:
+    delete:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: API Key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Revoke API key
+      tags:
+      - API Keys
   /audit:
     get:
       parameters:
@@ -317,6 +555,33 @@ paths:
       summary: List audit events
       tags:
       - Audit
+  /auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: User email
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.forgotIn'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      summary: Request password reset
+      tags:
+      - Auth
   /auth/login:
     post:
       consumes:
@@ -424,6 +689,41 @@ paths:
       summary: Refresh access token
       tags:
       - Auth
+  /auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Reset token and new password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.resetIn'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      summary: Reset password with token
+      tags:
+      - Auth
   /auth/signup:
     post:
       consumes:
@@ -457,6 +757,125 @@ paths:
       summary: Register a new user
       tags:
       - Auth
+  /billing/checkout-session:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Checkout parameters
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.checkoutIn'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create Stripe checkout session
+      tags:
+      - Billing
+  /billing/subscription:
+    get:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Ulpio_vergo_internal_domain_billing.Subscription'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get subscription
+      tags:
+      - Billing
+  /billing/usage:
+    get:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get usage vs plan limits
+      tags:
+      - Billing
+  /billing/webhook:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      summary: Stripe webhook
+      tags:
+      - Billing
   /context:
     get:
       produces:
@@ -1194,6 +1613,153 @@ paths:
       summary: Get presigned download URL
       tags:
       - Storage
+  /webhooks/endpoints:
+    get:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_Ulpio_vergo_internal_domain_webhook.Endpoint'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List webhook endpoints
+      tags:
+      - Webhooks
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Endpoint URL and events
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.createEndpointIn'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_Ulpio_vergo_internal_domain_webhook.Endpoint'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create webhook endpoint
+      tags:
+      - Webhooks
+  /webhooks/endpoints/{id}:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Endpoint ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated endpoint config
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handlers.updateEndpointIn'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update webhook endpoint
+      tags:
+      - Webhooks
+  /webhooks/test:
+    post:
+      parameters:
+      - description: Organization ID
+        in: header
+        name: X-Org-ID
+        required: true
+        type: string
+      - description: Endpoint ID to test
+        in: query
+        name: endpoint_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_http_handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Test webhook endpoint
+      tags:
+      - Webhooks
 securityDefinitions:
   BearerAuth:
     description: Bearer token (e.g. "Bearer eyJhbG...")

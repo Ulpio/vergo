@@ -1,8 +1,6 @@
 package router
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 
 	"github.com/Ulpio/vergo/internal/auth"
@@ -164,16 +162,4 @@ func Register(v1 *gin.RouterGroup) {
 		}
 	}
 
-	_ = http.StatusNotImplemented
-}
-
-func notImplemented(code string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.AbortWithStatusJSON(http.StatusNotImplemented, gin.H{
-			"error": gin.H{
-				"code":    code,
-				"message": "not_implemented",
-			},
-		})
-	}
 }

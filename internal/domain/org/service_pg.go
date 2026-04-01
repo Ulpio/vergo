@@ -45,7 +45,7 @@ func (s *pgService) Create(name, ownerUserID string) (Organization, error) {
 	if err != nil {
 		return Organization{}, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	qtx := s.q.WithTx(tx)
 

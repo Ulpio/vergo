@@ -59,7 +59,7 @@ func PGContainer(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	t.Cleanup(func() { database.Close() })
+	t.Cleanup(func() { _ = database.Close() })
 
 	// Wait for connection
 	for i := 0; i < 10; i++ {
