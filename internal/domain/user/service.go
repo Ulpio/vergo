@@ -18,6 +18,8 @@ type Service interface {
 	Signup(email, password string) (User, error)
 	Login(email, password string) (User, error)
 	GetByID(id string) (User, error)
+	GetByEmail(email string) (User, error)
+	UpdatePassword(userID, newPasswordHash string) error
 }
 
 type memoryRepo struct {
@@ -72,4 +74,26 @@ func (m *memoryRepo) GetByID(id string) (User, error) {
 		return User{}, ErrNotFound
 	}
 	return u, nil
+}
+
+func (m *memoryRepo) GetByEmail(email string) (User, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	id, ok := m.byEmail[email]
+	if !ok {
+		return User{}, ErrNotFound
+	}
+	return m.byID[id], nil
+}
+
+func (m *memoryRepo) UpdatePassword(userID, newPasswordHash string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u, ok := m.byID[userID]
+	if !ok {
+		return ErrNotFound
+	}
+	u.PasswordHash = newPasswordHash
+	m.byID[userID] = u
+	return nil
 }

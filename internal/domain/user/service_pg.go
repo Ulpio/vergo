@@ -63,3 +63,21 @@ func (s *pgService) GetByID(id string) (User, error) {
 	}
 	return User{ID: row.ID, Email: row.Email, PasswordHash: row.PasswordHash}, nil
 }
+
+func (s *pgService) GetByEmail(email string) (User, error) {
+	row, err := s.q.GetUserByEmail(context.Background(), email)
+	if errors.Is(err, sql.ErrNoRows) {
+		return User{}, ErrNotFound
+	}
+	if err != nil {
+		return User{}, err
+	}
+	return User{ID: row.ID, Email: row.Email, PasswordHash: row.PasswordHash}, nil
+}
+
+func (s *pgService) UpdatePassword(userID, newPasswordHash string) error {
+	return s.q.UpdateUserPassword(context.Background(), repo.UpdateUserPasswordParams{
+		ID:           userID,
+		PasswordHash: newPasswordHash,
+	})
+}

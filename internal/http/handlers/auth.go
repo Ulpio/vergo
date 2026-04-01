@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/Ulpio/vergo/internal/auth"
 	"github.com/Ulpio/vergo/internal/domain/user"
@@ -12,13 +14,14 @@ import (
 )
 
 type AuthHandler struct {
-	cfg config.Config
-	us  user.Service
-	rs  auth.RefreshStore
+	cfg    config.Config
+	us     user.Service
+	rs     auth.RefreshStore
+	resets auth.ResetStore
 }
 
-func NewAuthHandler(cfg config.Config, us user.Service, rs auth.RefreshStore) *AuthHandler {
-	return &AuthHandler{cfg: cfg, us: us, rs: rs}
+func NewAuthHandler(cfg config.Config, us user.Service, rs auth.RefreshStore, resets auth.ResetStore) *AuthHandler {
+	return &AuthHandler{cfg: cfg, us: us, rs: rs, resets: resets}
 }
 
 type creds struct {
@@ -217,6 +220,96 @@ func (h *AuthHandler) LogoutAll(c *gin.Context) {
 	}
 	_ = h.rs.RevokeAllForUser(context.Background(), uid)
 	c.Status(http.StatusNoContent)
+}
+
+type forgotIn struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// ForgotPassword generates a password reset token.
+// @Summary Request password reset
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body forgotIn true "User email"
+// @Success 200 {object} map[string]string
+// @Failure 422 {object} ErrorResponse
+// @Router /auth/forgot-password [post]
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var in forgotIn
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid_payload"})
+		return
+	}
+
+	// Always return success to prevent email enumeration
+	u, err := h.us.GetByEmail(in.Email)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"message": "if the email exists, a reset link was sent"})
+		return
+	}
+
+	token, err := h.resets.CreateResetToken(u.ID)
+	if err != nil {
+		slog.Error("forgot-password: create token", "error", err)
+		c.JSON(http.StatusOK, gin.H{"message": "if the email exists, a reset link was sent"})
+		return
+	}
+
+	// In production, send via email. For now, log to console.
+	slog.Info("password reset token generated",
+		"email", in.Email,
+		"token", token,
+		"reset_url", "/auth/reset-password?token="+token,
+	)
+
+	c.JSON(http.StatusOK, gin.H{"message": "if the email exists, a reset link was sent"})
+}
+
+type resetIn struct {
+	Token       string `json:"token" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=6"`
+}
+
+// ResetPassword resets the user's password using a valid token.
+// @Summary Reset password with token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body resetIn true "Reset token and new password"
+// @Success 200 {object} map[string]string
+// @Failure 401 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /auth/reset-password [post]
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var in resetIn
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid_payload"})
+		return
+	}
+
+	userID, err := h.resets.ValidateAndConsume(in.Token)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_or_expired_token"})
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(in.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "hash_error"})
+		return
+	}
+
+	if err := h.us.UpdatePassword(userID, string(hash)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "update_failed"})
+		return
+	}
+
+	// Revoke all refresh tokens for security
+	_ = h.rs.RevokeAllForUser(context.Background(), userID)
+
+	c.JSON(http.StatusOK, gin.H{"message": "password_reset_successful"})
 }
 
 // pequena função para ler user_id sem importar o middleware (evita dependência cruzada)

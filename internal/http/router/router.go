@@ -42,6 +42,7 @@ func Register(v1 *gin.RouterGroup) {
 	projSvc := project.NewPostgresService(sqlDB, queries)
 	auditSvc := audit.NewPostgresService(sqlDB, queries)
 	rfStore := auth.NewRefreshStore(sqlDB, queries)
+	resetStore := auth.NewResetStore(queries)
 	ctxSvc := userctx.NewPostgresService(sqlDB, queries)
 	fileSvc := file.NewPostgresService(sqlDB, queries)
 	keySvc := apikey.NewService(queries)
@@ -49,7 +50,7 @@ func Register(v1 *gin.RouterGroup) {
 	billSvc := billing.NewService(queries, cfg.StripeSecretKey)
 
 	// Handler
-	authH := handlers.NewAuthHandler(cfg, userSvc, rfStore)
+	authH := handlers.NewAuthHandler(cfg, userSvc, rfStore, resetStore)
 	orgH := handlers.NewOrgsHandler(orgSvc, auditSvc)
 	projH := handlers.NewProjectsHandler(projSvc, auditSvc)
 	meH := handlers.NewMeHandler(userSvc, orgSvc)
@@ -72,8 +73,8 @@ func Register(v1 *gin.RouterGroup) {
 		auth.POST("/login", authH.Login)
 		auth.POST("/refresh", authH.Refresh)
 		auth.POST("/logout", authH.Logout) // revoga um refresh específico
-		auth.POST("/forgot-password", notImplemented("auth.forgot_password"))
-		auth.POST("/reset-password", notImplemented("auth.reset_password"))
+		auth.POST("/forgot-password", authH.ForgotPassword)
+		auth.POST("/reset-password", authH.ResetPassword)
 	}
 
 	// Stripe webhook (público, sem auth — verifica assinatura Stripe)
