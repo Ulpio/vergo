@@ -2,103 +2,193 @@
 # Vergo — SaaS Starter (Go)
 
 [![CI](https://github.com/Ulpio/vergo/actions/workflows/ci.yml/badge.svg)](https://github.com/Ulpio/vergo/actions/workflows/ci.yml)
+[![CD](https://github.com/Ulpio/vergo/actions/workflows/cd.yml/badge.svg)](https://github.com/Ulpio/vergo/actions/workflows/cd.yml)
 [![CodeQL](https://github.com/Ulpio/vergo/actions/workflows/codeql.yml/badge.svg)](https://github.com/Ulpio/vergo/actions/workflows/codeql.yml)
 
-Boilerplate de **SaaS multi-tenant** escrito em **Golang**, projetado para servir como base sólida em aplicações modernas.  
-Inclui autenticação JWT, RBAC, auditoria, webhooks, billing (Stripe), integração com S3 e observabilidade (OpenTelemetry).
+Production-ready **multi-tenant SaaS boilerplate** in Go. Ships with JWT auth, RBAC, Stripe billing, webhooks, API keys, S3 storage, OpenTelemetry observability, and type-safe SQL — ready to build on.
 
 ---
 
-## ✨ Features (MVP)
-- Estrutura em camadas: **handlers → services → repo**
-- **Autenticação/JWT** com refresh tokens
-- **RBAC** por organização (multi-tenant)
-- **Postgres + sqlc** para queries tipadas
-- **Docker Compose** para ambiente local
-- **CI/CD** com GitHub Actions (build + test + CodeQL + Dependabot)
-- **Observabilidade** preparada (tracing/metrics/logging)
+## Features
+
+| Category | What's included |
+|----------|----------------|
+| **Auth** | Signup, login, refresh token rotation, forgot/reset password, logout, logout-all |
+| **Multi-tenant** | Organizations, memberships (owner/admin/member), tenant middleware via `X-Org-ID` |
+| **RBAC** | Role-based access control per organization |
+| **API Keys** | Programmatic access with `sk_...` tokens (SHA-256 hashed, optional expiry) |
+| **Billing** | Stripe Checkout, subscriptions, webhook handler, plan gating middleware |
+| **Webhooks** | CRUD endpoints, HMAC-SHA256 signing, dispatcher with exponential backoff retries |
+| **Storage** | S3-compatible presigned uploads/downloads, file metadata tracking |
+| **Audit** | Immutable audit log with actor, action, entity, metadata, and optional filters |
+| **Data Layer** | PostgreSQL + sqlc type-safe generated queries |
+| **Observability** | OpenTelemetry (traces + metrics), structured logging (slog), Jaeger, Prometheus |
+| **Security** | Fuzz testing (JWT + RBAC), rate limiting, graceful shutdown, SQL lint (sqlfluff) |
+| **DX** | Dev Container, Swagger UI, Makefile, hot-reload (air), Dependabot |
+| **CI/CD** | GitHub Actions: build, test, vet, golangci-lint, sqlc check, swagger check, Docker push to GHCR |
 
 ---
 
-## 🚀 Quickstart
-Clone e rode:
+## Quickstart
 
 ```bash
 git clone git@github.com:Ulpio/vergo.git
 cd vergo
+cp .env.example .env
 
-go mod tidy
-go run ./cmd/api
+# Start Postgres + infra
+docker compose up -d
 
-# API disponível em http://localhost:8080/healthz
+# Run API
+make run
+# or with hot-reload:
+make dev
 ```
 
-Para subir Postgres + PgAdmin:
-```bash
-docker compose up -d db pgadmin
-```
+API: http://localhost:8080/healthz
+Swagger UI: http://localhost:8080/swagger/index.html
 
 ### Dev Container (VS Code / Cursor)
 
-Open the project in a ready-to-code environment with Go, PostgreSQL, and all tools pre-installed:
+1. Install [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension
+2. **Ctrl+Shift+P** > *"Dev Containers: Reopen in Container"*
 
-1. Install the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension
-2. Open the project folder → **Ctrl+Shift+P** → *"Dev Containers: Reopen in Container"*
-3. Wait for the container to build (first time only, ~2 min)
+Includes: Go 1.25, PostgreSQL 16, migrate, golangci-lint, swag, air, sqlfluff.
 
-The container includes: Go 1.25, PostgreSQL 16, `migrate`, `golangci-lint`, `swag`, `air`, `sqlfluff`.
-Ports forwarded: API (8080), PostgreSQL (5432), Jaeger (16686), Prometheus (9090).
+### Docker (Production)
+
+```bash
+docker build -t vergo .
+docker run -p 8080:8080 --env-file .env vergo
+```
+
+Image is also published to GHCR on every push to main:
+```bash
+docker pull ghcr.io/ulpio/vergo:main
+```
 
 ---
 
-## 🧱 Estrutura do projeto
+## API Endpoints
+
+### Public (no auth)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/v1/auth/signup` | Register |
+| POST | `/v1/auth/login` | Login |
+| POST | `/v1/auth/refresh` | Rotate tokens |
+| POST | `/v1/auth/logout` | Revoke refresh token |
+| POST | `/v1/auth/forgot-password` | Request password reset |
+| POST | `/v1/auth/reset-password` | Reset password with token |
+| POST | `/v1/billing/webhook` | Stripe webhook (signature verified) |
+
+### Authenticated (Bearer JWT)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/v1/me` | Current user |
+| POST | `/v1/auth/logout-all` | Revoke all sessions |
+| GET/POST | `/v1/context` | Get/set active org |
+| POST | `/v1/orgs` | Create organization |
+| GET | `/v1/orgs/:id` | Get organization |
+
+### Authenticated + Tenant (requires `X-Org-ID` or active context)
+
+| Method | Path | Roles | Description |
+|--------|------|-------|-------------|
+| POST | `/v1/orgs/:id/members` | admin | Add member |
+| PATCH | `/v1/orgs/:id/members/:userId` | admin | Update role |
+| DELETE | `/v1/orgs/:id/members/:userId` | admin | Remove member |
+| DELETE | `/v1/orgs/:id` | owner | Delete org |
+| GET/POST | `/v1/projects` | member+ | List/create projects |
+| GET/PATCH/DELETE | `/v1/projects/:id` | member+ | Manage project |
+| GET | `/v1/audit` | admin | Audit log (with filters) |
+| POST/GET/DELETE | `/v1/api-keys` | member+ | Manage API keys |
+| POST/GET/PATCH | `/v1/webhooks/endpoints` | member+ | Manage webhooks |
+| POST | `/v1/webhooks/test` | member+ | Test webhook delivery |
+| POST | `/v1/billing/checkout-session` | member+ | Create Stripe checkout |
+| GET | `/v1/billing/subscription` | member+ | Get subscription |
+| GET | `/v1/billing/usage` | member+ | Usage vs plan limits |
+| POST/GET | `/v1/storage/presign*` | member+ | Upload/download URLs |
+| POST/GET/DELETE | `/v1/storage/files*` | member+ | File metadata |
+
+API keys (`Bearer sk_...`) can be used as an alternative to JWT for programmatic access.
+
+---
+
+## Project Structure
+
 ```
-cmd/api/main.go                # entrypoint da API
+cmd/api/main.go                    # Entrypoint
 internal/
-  http/router/router.go        # rotas
-  http/middleware/             # middlewares (auth, rbac, tenant)
-  domain/{user,org,project}/   # serviços de domínio
-  pkg/config/                  # configuração (env)
-  repo/                        # código gerado pelo sqlc
+  auth/                            # JWT, refresh store, password reset
+  domain/
+    user/                          # User service (signup, login, password)
+    org/                           # Org + membership service
+    project/                       # Project CRUD
+    audit/                         # Audit log
+    apikey/                        # API key management
+    webhook/                       # Webhook endpoints + dispatcher
+    billing/                       # Stripe billing + plan limits
+    file/                          # File metadata
+    userctx/                       # Active org context
+  http/
+    handlers/                      # HTTP handlers
+    middleware/                    # Auth, tenant, RBAC, rate limit, plan
+    router/                        # Route registration + wiring
+  repo/                            # sqlc generated code
+  pkg/
+    config/                        # Env-based configuration
+    db/                            # Database connection + migrations
+    telemetry/                     # OpenTelemetry setup
+    logging/                       # Structured logger (slog)
+    ratelimit/                     # Token bucket rate limiter
+  storage/s3/                      # S3-compatible storage client
 db/
-  migrations/                  # migrations SQL
-  queries/                     # queries do sqlc
-scripts/seed/                  # seed de dados
-.github/workflows/             # CI/CD
+  migrations/                      # SQL migrations (0001-0011)
+  queries/                         # sqlc query files
+.github/workflows/                 # CI + CD + CodeQL + Dependabot
 ```
 
 ---
 
-## 🧭 Roadmap
+## Configuration
 
-### ✅ Concluído
-- Estrutura inicial do projeto (boilerplate Go + Gin).
-- CI/CD com GitHub Actions (build, test, CodeQL, Dependabot).
-- Auth (signup/login/refresh) com JWT (in-memory).
-- Integração com Postgres (docker-compose + .env).
-- CRUD de Projects persistido no Postgres.
-- Organizations + Memberships (owner/admin/member).
-- Tenant Middleware (validação de membership por `X-Org-ID`).
-- RBAC real baseado em role (`owner` | `admin` | `member`).
-- Endpoints de gestão de membros (`PATCH`, `DELETE`).
-- Endpoint `/me` (dados do usuário autenticado).
-- Audit Log persistente.
+All config via environment variables. See [`.env.example`](.env.example) for defaults.
 
-### 🚧 Em andamento
-- Context API (`/context`) para org ativa sem header.
-- Persistência de refresh tokens (logout, revogação).
-- Upload com S3 (presigned URLs).
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `APP_PORT` | 8080 | API port |
+| `APP_ENV` | dev | Environment (dev/production) |
+| `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` | localhost/5432/app/app/vergo | PostgreSQL |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | dev-* | JWT signing keys |
+| `S3_BUCKET` / `S3_ENDPOINT` | - | S3-compatible storage |
+| `STRIPE_SECRET_KEY` | - | Stripe API key |
+| `STRIPE_WEBHOOK_SECRET` | - | Stripe webhook signing secret |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | - | OTLP gRPC endpoint |
+| `METRICS_PORT` | 0 (disabled) | Prometheus scrape port |
 
-### 📌 Próximos passos
-- Integração com Stripe (planos, checkout, webhook).
-- Observabilidade com OpenTelemetry (traces, métricas, logs).
-- Refatorar queries com **sqlc** para tipagem forte.
-
-### 🌟 Futuro
-- Templates multi-tenant (boas práticas SaaS).
-- Deploy em cloud (AWS ECS/Fargate + RDS + S3).
-- Documentação via Swagger/OpenAPI.
 ---
 
-## 📜 Licença
+## Make Targets
+
+```bash
+make help          # Show all targets
+make run           # Run server
+make dev           # Run with hot-reload (air)
+make test          # Unit tests
+make lint          # golangci-lint
+make swagger       # Regenerate Swagger docs
+make sqlc          # Regenerate sqlc code
+make check         # vet + lint + test (CI equivalent)
+make docker-up     # Start Postgres + infra
+make docker-reset  # Reset database
+make migrate-up    # Run migrations
+```
+
+---
+
+## License
+
 [MIT](./LICENSE)
