@@ -96,6 +96,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sqlc-dev/pqtype v0.3.0 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
+	github.com/stripe/stripe-go/v82 v82.5.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect

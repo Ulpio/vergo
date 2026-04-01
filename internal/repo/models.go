@@ -81,6 +81,18 @@ type RefreshToken struct {
 	CreatedAt   time.Time      `json:"created_at"`
 }
 
+type Subscription struct {
+	ID                   string         `json:"id"`
+	OrgID                string         `json:"org_id"`
+	StripeCustomerID     string         `json:"stripe_customer_id"`
+	StripeSubscriptionID sql.NullString `json:"stripe_subscription_id"`
+	Status               string         `json:"status"`
+	Plan                 string         `json:"plan"`
+	CurrentPeriodEnd     sql.NullTime   `json:"current_period_end"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+}
+
 type User struct {
 	ID           string    `json:"id"`
 	Email        string    `json:"email"`

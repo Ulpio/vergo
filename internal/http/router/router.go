@@ -8,6 +8,7 @@ import (
 	"github.com/Ulpio/vergo/internal/auth"
 	"github.com/Ulpio/vergo/internal/domain/apikey"
 	"github.com/Ulpio/vergo/internal/domain/audit"
+	"github.com/Ulpio/vergo/internal/domain/billing"
 	"github.com/Ulpio/vergo/internal/domain/webhook"
 	"github.com/Ulpio/vergo/internal/domain/file"
 	"github.com/Ulpio/vergo/internal/domain/org"
@@ -45,6 +46,7 @@ func Register(v1 *gin.RouterGroup) {
 	fileSvc := file.NewPostgresService(sqlDB, queries)
 	keySvc := apikey.NewService(queries)
 	whSvc := webhook.NewService(queries)
+	billSvc := billing.NewService(queries, cfg.StripeSecretKey)
 
 	// Handler
 	authH := handlers.NewAuthHandler(cfg, userSvc, rfStore)
@@ -55,6 +57,7 @@ func Register(v1 *gin.RouterGroup) {
 	ctxH := handlers.NewContextHandler(ctxSvc, orgSvc)
 	keyH := handlers.NewAPIKeysHandler(keySvc, auditSvc)
 	whH := handlers.NewWebhooksHandler(whSvc)
+	billH := handlers.NewBillingHandler(billSvc, cfg.StripeWebhookSecret)
 
 	s3c, err := s3store.NewFromConfig(cfg)
 	if err != nil {
@@ -72,6 +75,9 @@ func Register(v1 *gin.RouterGroup) {
 		auth.POST("/forgot-password", notImplemented("auth.forgot_password"))
 		auth.POST("/reset-password", notImplemented("auth.reset_password"))
 	}
+
+	// Stripe webhook (público, sem auth — verifica assinatura Stripe)
+	v1.POST("/billing/webhook", billH.Webhook)
 
 	// ── Apenas autenticado (NÃO exige X-Org-ID) ───────────────────────
 	authOnly := v1.Group("/")
@@ -136,12 +142,12 @@ func Register(v1 *gin.RouterGroup) {
 			wh.POST("/test", whH.Test)
 		}
 
-		// Billing
-		billing := protected.Group("/billing")
+		// Billing (webhook is registered as public above)
+		billingG := protected.Group("/billing")
 		{
-			billing.POST("/checkout-session", notImplemented("billing.checkout_session"))
-			billing.GET("/subscription", notImplemented("billing.subscription.get"))
-			billing.POST("/webhook", notImplemented("billing.webhook"))
+			billingG.POST("/checkout-session", billH.CreateCheckoutSession)
+			billingG.GET("/subscription", billH.GetSubscription)
+			billingG.GET("/usage", billH.GetUsage)
 		}
 
 		// Storage

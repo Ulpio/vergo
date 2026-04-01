@@ -47,6 +47,10 @@ type Config struct {
 	OTLPEndpoint string // OTLP gRPC endpoint (e.g. localhost:4317)
 	OTLPInsecure bool   // use insecure connection (no TLS)
 	MetricsPort  int    // Prometheus /metrics scrape port (0 = disabled)
+
+	// Stripe
+	StripeSecretKey    string
+	StripeWebhookSecret string
 }
 
 func getenv(key, def string) string {
@@ -128,5 +132,9 @@ func Load() Config {
 		OTLPEndpoint: getenv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
 		OTLPInsecure: getbool("OTEL_EXPORTER_OTLP_INSECURE", true),
 		MetricsPort:  getint("METRICS_PORT", 0),
+
+		// Stripe
+		StripeSecretKey:    getenv("STRIPE_SECRET_KEY", ""),
+		StripeWebhookSecret: getenv("STRIPE_WEBHOOK_SECRET", ""),
 	}
 }
