@@ -3,6 +3,7 @@ package userctx
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/Ulpio/vergo/internal/repo"
 )
@@ -23,7 +24,7 @@ func NewPostgresService(db *sql.DB, q *repo.Queries) Service {
 
 func (s *pgService) GetActiveOrg(userID string) (string, bool, error) {
 	orgID, err := s.q.GetActiveOrg(context.Background(), userID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil
 	}
 	return orgID, err == nil, err

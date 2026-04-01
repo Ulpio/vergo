@@ -7,6 +7,7 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"time"
 
@@ -47,24 +48,24 @@ SELECT org_id, actor_id, action, entity, entity_id,
        created_at
 FROM audit_logs
 WHERE org_id = $1
-  AND ($2::text IS NULL OR actor_id = $2)
-  AND ($3::text IS NULL OR action = $3)
-  AND ($4::text IS NULL OR entity = $4)
-  AND ($5::timestamptz IS NULL OR created_at >= $5)
-  AND ($6::timestamptz IS NULL OR created_at <= $6)
+  AND (CAST($2 AS text) IS NULL OR actor_id = CAST($2 AS text))
+  AND (CAST($3 AS text) IS NULL OR action = CAST($3 AS text))
+  AND (CAST($4 AS text) IS NULL OR entity = CAST($4 AS text))
+  AND (CAST($5 AS timestamptz) IS NULL OR created_at >= CAST($5 AS timestamptz))
+  AND (CAST($6 AS timestamptz) IS NULL OR created_at <= CAST($6 AS timestamptz))
 ORDER BY created_at DESC
-LIMIT $7 OFFSET $8
+LIMIT $8 OFFSET $7
 `
 
 type ListAuditLogsParams struct {
-	OrgID   string    `json:"org_id"`
-	Column2 string    `json:"column_2"`
-	Column3 string    `json:"column_3"`
-	Column4 string    `json:"column_4"`
-	Column5 time.Time `json:"column_5"`
-	Column6 time.Time `json:"column_6"`
-	Limit   int32     `json:"limit"`
-	Offset  int32     `json:"offset"`
+	OrgID         string         `json:"org_id"`
+	FilterActorID sql.NullString `json:"filter_actor_id"`
+	FilterAction  sql.NullString `json:"filter_action"`
+	FilterEntity  sql.NullString `json:"filter_entity"`
+	FilterSince   sql.NullTime   `json:"filter_since"`
+	FilterUntil   sql.NullTime   `json:"filter_until"`
+	QueryOffset   int32          `json:"query_offset"`
+	QueryLimit    int32          `json:"query_limit"`
 }
 
 type ListAuditLogsRow struct {
@@ -80,13 +81,13 @@ type ListAuditLogsRow struct {
 func (q *Queries) ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([]ListAuditLogsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listAuditLogs,
 		arg.OrgID,
-		arg.Column2,
-		arg.Column3,
-		arg.Column4,
-		arg.Column5,
-		arg.Column6,
-		arg.Limit,
-		arg.Offset,
+		arg.FilterActorID,
+		arg.FilterAction,
+		arg.FilterEntity,
+		arg.FilterSince,
+		arg.FilterUntil,
+		arg.QueryOffset,
+		arg.QueryLimit,
 	)
 	if err != nil {
 		return nil, err

@@ -7,11 +7,11 @@ SELECT org_id, actor_id, action, entity, entity_id,
        COALESCE(metadata, '{}') AS metadata,
        created_at
 FROM audit_logs
-WHERE org_id = $1
-  AND ($2::text IS NULL OR actor_id = $2)
-  AND ($3::text IS NULL OR action = $3)
-  AND ($4::text IS NULL OR entity = $4)
-  AND ($5::timestamptz IS NULL OR created_at >= $5)
-  AND ($6::timestamptz IS NULL OR created_at <= $6)
+WHERE org_id = @org_id
+  AND (CAST(sqlc.narg('filter_actor_id') AS text) IS NULL OR actor_id = CAST(sqlc.narg('filter_actor_id') AS text))
+  AND (CAST(sqlc.narg('filter_action') AS text) IS NULL OR action = CAST(sqlc.narg('filter_action') AS text))
+  AND (CAST(sqlc.narg('filter_entity') AS text) IS NULL OR entity = CAST(sqlc.narg('filter_entity') AS text))
+  AND (CAST(sqlc.narg('filter_since') AS timestamptz) IS NULL OR created_at >= CAST(sqlc.narg('filter_since') AS timestamptz))
+  AND (CAST(sqlc.narg('filter_until') AS timestamptz) IS NULL OR created_at <= CAST(sqlc.narg('filter_until') AS timestamptz))
 ORDER BY created_at DESC
-LIMIT $7 OFFSET $8;
+LIMIT @query_limit OFFSET @query_offset;

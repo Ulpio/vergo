@@ -48,14 +48,14 @@ func (s *pgService) List(p ListParams) ([]Event, error) {
 	}
 
 	rows, err := s.q.ListAuditLogs(context.Background(), repo.ListAuditLogsParams{
-		OrgID:   p.OrgID,
-		Column2: derefStr(p.ActorID),
-		Column3: derefStr(p.Action),
-		Column4: derefStr(p.Entity),
-		Column5: derefTime(p.Since),
-		Column6: derefTime(p.Until),
-		Limit:   int32(limit),
-		Offset:  int32(offset),
+		OrgID:         p.OrgID,
+		FilterActorID: toNullString(p.ActorID),
+		FilterAction:  toNullString(p.Action),
+		FilterEntity:  toNullString(p.Entity),
+		FilterSince:   toNullTime(p.Since),
+		FilterUntil:   toNullTime(p.Until),
+		QueryLimit:    int32(limit),
+		QueryOffset:   int32(offset),
 	})
 	if err != nil {
 		return nil, err
@@ -80,16 +80,16 @@ func (s *pgService) List(p ListParams) ([]Event, error) {
 	return out, nil
 }
 
-func derefStr(s *string) string {
+func toNullString(s *string) sql.NullString {
 	if s == nil {
-		return ""
+		return sql.NullString{}
 	}
-	return *s
+	return sql.NullString{String: *s, Valid: true}
 }
 
-func derefTime(t *time.Time) time.Time {
+func toNullTime(t *time.Time) sql.NullTime {
 	if t == nil {
-		return time.Time{}
+		return sql.NullTime{}
 	}
-	return *t
+	return sql.NullTime{Time: *t, Valid: true}
 }
