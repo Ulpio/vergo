@@ -6,6 +6,8 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+
+	"github.com/Ulpio/vergo/internal/repo"
 )
 
 var (
@@ -22,80 +24,87 @@ type Service interface {
 
 type pgService struct {
 	db *sql.DB
+	q  *repo.Queries
 }
 
-func NewPostgresService(db *sql.DB) Service {
-	return &pgService{db: db}
+func NewPostgresService(db *sql.DB, q *repo.Queries) Service {
+	return &pgService{db: db, q: q}
 }
+
+func repoToProject(r repo.Project) Project {
+	return Project{
+		ID:          r.ID,
+		OrgID:       r.OrgID,
+		Name:        r.Name,
+		Description: r.Description.String,
+		CreatedBy:   r.CreatedBy,
+		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   r.UpdatedAt,
+	}
+}
+
 func (s *pgService) List(orgID string) ([]Project, error) {
-	const q = `
-		SELECT id, org_id, name, description, created_by, created_at, updated_at
-		FROM projects
-		WHERE org_id = $1
-		ORDER BY created_at ASC`
-	rows, err := s.db.QueryContext(context.Background(), q, orgID)
+	rows, err := s.q.ListProjects(context.Background(), orgID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var out []Project
-	for rows.Next() {
-		var p Project
-		if err := rows.Scan(&p.ID, &p.OrgID, &p.Name, &p.Description, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, p)
+	out := make([]Project, len(rows))
+	for i, r := range rows {
+		out[i] = repoToProject(r)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s *pgService) Create(orgID, name, description, userID string) (Project, error) {
-	const q = `
-INSERT INTO projects (id, org_id, name, description, created_by, created_at, updated_at)
-VALUES ($1,$2,$3,$4,$5, NOW(), NOW())
-RETURNING id, org_id, name, description, created_by, created_at, updated_at`
 	id := uuid.NewString()
-	var p Project
-	err := s.db.QueryRowContext(context.Background(), q, id, orgID, name, description, userID).
-		Scan(&p.ID, &p.OrgID, &p.Name, &p.Description, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt)
-	return p, err
+	r, err := s.q.InsertProject(context.Background(), repo.InsertProjectParams{
+		ID:          id,
+		OrgID:       orgID,
+		Name:        name,
+		Description: sql.NullString{String: description, Valid: description != ""},
+		CreatedBy:   userID,
+	})
+	if err != nil {
+		return Project{}, err
+	}
+	return repoToProject(r), nil
 }
 
 func (s *pgService) Get(orgID, id string) (Project, error) {
-	const q = `
-SELECT id, org_id, name, description, created_by, created_at, updated_at
-FROM projects
-WHERE id = $1 AND org_id = $2`
-	var p Project
-	err := s.db.QueryRowContext(context.Background(), q, id, orgID).
-		Scan(&p.ID, &p.OrgID, &p.Name, &p.Description, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt)
+	r, err := s.q.GetProject(context.Background(), repo.GetProjectParams{
+		ID:    id,
+		OrgID: orgID,
+	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return Project{}, ErrNotFound
 	}
-	return p, err
+	if err != nil {
+		return Project{}, err
+	}
+	return repoToProject(r), nil
 }
 
 func (s *pgService) Update(orgID, id, name, description string) (Project, error) {
-	const q = `
-UPDATE projects
-SET name = COALESCE(NULLIF($3,''), name),
-    description = $4,
-    updated_at = NOW()
-WHERE id = $1 AND org_id = $2
-RETURNING id, org_id, name, description, created_by, created_at, updated_at`
-	var p Project
-	err := s.db.QueryRowContext(context.Background(), q, id, orgID, name, description).
-		Scan(&p.ID, &p.OrgID, &p.Name, &p.Description, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt)
+	r, err := s.q.UpdateProject(context.Background(), repo.UpdateProjectParams{
+		ID:          id,
+		OrgID:       orgID,
+		Column3:     name,
+		Description: sql.NullString{String: description, Valid: description != ""},
+	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return Project{}, ErrNotFound
 	}
-	return p, err
+	if err != nil {
+		return Project{}, err
+	}
+	return repoToProject(r), nil
 }
 
 func (s *pgService) Delete(orgID, id string) error {
-	const q = `DELETE FROM projects WHERE id = $1 AND org_id = $2`
-	res, err := s.db.ExecContext(context.Background(), q, id, orgID)
+	res, err := s.q.DeleteProject(context.Background(), repo.DeleteProjectParams{
+		ID:    id,
+		OrgID: orgID,
+	})
 	if err != nil {
 		return err
 	}

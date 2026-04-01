@@ -16,6 +16,7 @@ import (
 	"github.com/Ulpio/vergo/internal/http/middleware"
 	"github.com/Ulpio/vergo/internal/pkg/config"
 	"github.com/Ulpio/vergo/internal/pkg/db"
+	"github.com/Ulpio/vergo/internal/repo"
 	s3store "github.com/Ulpio/vergo/internal/storage/s3"
 )
 
@@ -29,14 +30,17 @@ func Register(v1 *gin.RouterGroup) {
 		panic(err)
 	}
 
+	// Repo (sqlc generated queries)
+	queries := repo.New(sqlDB)
+
 	// Services
-	userSvc := user.NewPostgresService(sqlDB)
-	orgSvc := org.NewPostgresService(sqlDB)
-	projSvc := project.NewPostgresService(sqlDB)
-	auditSvc := audit.NewPostgresService(sqlDB)
-	rfStore := auth.NewRefreshStore(sqlDB)
-	ctxSvc := userctx.NewPostgresService(sqlDB)
-	fileSvc := file.NewPostgresService(sqlDB)
+	userSvc := user.NewPostgresService(sqlDB, queries)
+	orgSvc := org.NewPostgresService(sqlDB, queries)
+	projSvc := project.NewPostgresService(sqlDB, queries)
+	auditSvc := audit.NewPostgresService(sqlDB, queries)
+	rfStore := auth.NewRefreshStore(sqlDB, queries)
+	ctxSvc := userctx.NewPostgresService(sqlDB, queries)
+	fileSvc := file.NewPostgresService(sqlDB, queries)
 
 	// Handler
 	authH := handlers.NewAuthHandler(cfg, userSvc, rfStore)

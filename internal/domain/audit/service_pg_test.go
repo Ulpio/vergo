@@ -9,11 +9,12 @@ import (
 
 	"github.com/Ulpio/vergo/internal/domain/audit"
 	"github.com/Ulpio/vergo/internal/pkg/testutil"
+	"github.com/Ulpio/vergo/internal/repo"
 )
 
 func TestPGService_RecordAndList(t *testing.T) {
 	db := testutil.PGContainer(t)
-	svc := audit.NewPostgresService(db)
+	svc := audit.NewPostgresService(db, repo.New(db))
 
 	evt := audit.Event{
 		OrgID:     "org-1",
@@ -47,7 +48,7 @@ func TestPGService_RecordAndList(t *testing.T) {
 
 func TestPGService_ListFilters(t *testing.T) {
 	db := testutil.PGContainer(t)
-	svc := audit.NewPostgresService(db)
+	svc := audit.NewPostgresService(db, repo.New(db))
 
 	// Record multiple events
 	for _, action := range []string{"org.created", "project.created", "project.deleted"} {
@@ -78,7 +79,7 @@ func TestPGService_ListFilters(t *testing.T) {
 
 func TestPGService_ListPagination(t *testing.T) {
 	db := testutil.PGContainer(t)
-	svc := audit.NewPostgresService(db)
+	svc := audit.NewPostgresService(db, repo.New(db))
 
 	for i := 0; i < 5; i++ {
 		svc.Record(audit.Event{
@@ -104,7 +105,7 @@ func TestPGService_ListPagination(t *testing.T) {
 
 func TestPGService_MetadataRoundTrip(t *testing.T) {
 	db := testutil.PGContainer(t)
-	svc := audit.NewPostgresService(db)
+	svc := audit.NewPostgresService(db, repo.New(db))
 
 	before := json.RawMessage(`{"role":"member"}`)
 	after := json.RawMessage(`{"role":"admin"}`)

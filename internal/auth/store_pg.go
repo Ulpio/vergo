@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"time"
+
+	"github.com/Ulpio/vergo/internal/repo"
 )
 
 type RefreshStore interface {
@@ -18,9 +20,12 @@ type RefreshStore interface {
 
 type pgStore struct {
 	db *sql.DB
+	q  *repo.Queries
 }
 
-func NewRefreshStore(db *sql.DB) RefreshStore { return &pgStore{db: db} }
+func NewRefreshStore(db *sql.DB, q *repo.Queries) RefreshStore {
+	return &pgStore{db: db, q: q}
+}
 
 func hash(token string) string {
 	sum := sha256.Sum256([]byte(token))
@@ -28,47 +33,42 @@ func hash(token string) string {
 }
 
 func (s *pgStore) SaveRefresh(ctx context.Context, jti, userID, token string, expiresAt time.Time, rotatedFrom *string) error {
-	const q = `
-INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, rotated_from)
-VALUES ($1,$2,$3,$4,$5)`
-	_, err := s.db.ExecContext(ctx, q, jti, userID, hash(token), expiresAt, rotatedFrom)
-	return err
+	params := repo.InsertRefreshTokenParams{
+		ID:        jti,
+		UserID:    userID,
+		TokenHash: hash(token),
+		ExpiresAt: expiresAt,
+	}
+	if rotatedFrom != nil {
+		params.RotatedFrom = sql.NullString{String: *rotatedFrom, Valid: true}
+	}
+	return s.q.InsertRefreshToken(ctx, params)
 }
 
 func (s *pgStore) IsValid(ctx context.Context, jti, token string) (bool, string, time.Time, error) {
-	const q = `
-SELECT user_id, token_hash, expires_at, revoked_at
-FROM refresh_tokens
-WHERE id = $1`
-	var userID, tokenHash string
-	var exp time.Time
-	var revokedAt sql.NullTime
-
-	err := s.db.QueryRowContext(ctx, q, jti).Scan(&userID, &tokenHash, &exp, &revokedAt)
+	row, err := s.q.GetRefreshToken(ctx, jti)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, "", time.Time{}, nil
 	}
 	if err != nil {
 		return false, "", time.Time{}, err
 	}
-	if revokedAt.Valid {
+	if row.RevokedAt.Valid {
 		return false, "", time.Time{}, nil
 	}
-	if time.Now().After(exp) {
+	if time.Now().After(row.ExpiresAt) {
 		return false, "", time.Time{}, nil
 	}
-	if tokenHash != hash(token) {
+	if row.TokenHash != hash(token) {
 		return false, "", time.Time{}, nil
 	}
-	return true, userID, exp, nil
+	return true, row.UserID, row.ExpiresAt, nil
 }
 
 func (s *pgStore) Revoke(ctx context.Context, jti string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1 AND revoked_at IS NULL`, jti)
-	return err
+	return s.q.RevokeToken(ctx, jti)
 }
 
 func (s *pgStore) RevokeAllForUser(ctx context.Context, userID string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`, userID)
-	return err
+	return s.q.RevokeAllUserTokens(ctx, userID)
 }

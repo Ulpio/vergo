@@ -98,3 +98,35 @@ jobs:
         run: |
           swag init -g cmd/api/main.go -o docs/swagger --parseDependency --parseInternal
           git diff --exit-code docs/swagger/ || (echo "::error::Swagger docs are out of date. Run 'make swagger' and commit." && exit 1)
+
+  sqlc-check:
+    name: sqlc Code Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.x'
+          check-latest: true
+
+      - name: Cache Go modules
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install sqlc
+        run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+
+      - name: Check sqlc code is up-to-date
+        run: |
+          sqlc generate
+          git diff --exit-code internal/repo/ || (echo "::error::sqlc code is out of date. Run 'make sqlc' and commit." && exit 1)
